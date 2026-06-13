@@ -1,4 +1,4 @@
-"""Standalone provider-sync package smoke test.
+"""Standalone provider-config-sync package smoke test.
 
 Run:
     cd backend && .venv/bin/python scripts/test_provider_sync_standalone_package.py
@@ -15,12 +15,12 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve()
 _ROOT = _HERE.parents[1]
-_PACKAGE_SRC = _ROOT / "packages" / "provider-sync-backend" / "src"
+_PACKAGE_SRC = _ROOT / "packages" / "provider-config-sync-backend" / "src"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
-from provider_sync_backend import api  # noqa: E402
-from provider_sync_backend.standalone import create_app  # noqa: E402
+from provider_config_sync_backend import api  # noqa: E402
+from provider_config_sync_backend.standalone import create_app  # noqa: E402
 
 FAILURES: list[str] = []
 
@@ -36,7 +36,7 @@ async def _noop(*_args, **_kwargs):
 
 
 def t_standalone_project_mcp_roundtrip() -> None:
-    wipe = Path(tempfile.mkdtemp(prefix="provider-sync-standalone-"))
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-standalone-"))
     try:
         project = (wipe / "project").resolve()
         project.mkdir()
@@ -98,11 +98,11 @@ def t_standalone_project_mcp_roundtrip() -> None:
 
 
 def t_standalone_app_loads_json_config() -> None:
-    wipe = Path(tempfile.mkdtemp(prefix="provider-sync-standalone-app-"))
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-standalone-app-"))
     try:
         project = (wipe / "project").resolve()
         project.mkdir()
-        config_path = wipe / "provider-sync.json"
+        config_path = wipe / "provider-config-sync.json"
         config_path.write_text(
             json.dumps(
                 {
@@ -118,7 +118,7 @@ def t_standalone_app_loads_json_config() -> None:
         )
         app = create_app(config_path)
         paths = {route.path for route in app.routes}
-        check("/api/provider-sync" in paths, "standalone FastAPI app mounts provider-sync route")
+        check("/api/provider-config-sync" in paths, "standalone FastAPI app mounts provider-config-sync route")
     finally:
         shutil.rmtree(wipe)
 

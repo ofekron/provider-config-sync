@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "better-agent-provider-sync-backend"
+name = "better-agent-provider-config-sync-backend"
 version = "0.1.0"
 requires-python = ">=3.11"
 license = "MIT"
@@ -17,7 +17,7 @@ dependencies = [
 server = ["uvicorn"]
 
 [project.scripts]
-provider-sync-backend = "provider_sync_backend.standalone:main"
+provider-config-sync-backend = "provider_config_sync_backend.standalone:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/provider_sync_backend"]
+packages = ["src/provider_config_sync_backend"]

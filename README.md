@@ -1,10 +1,10 @@
-# Provider Sync
+# Provider Config Sync
 
 **One control plane for AI-agent configuration across Claude, Codex, and Gemini.**
 
-Provider Sync keeps each provider's native config files intact while giving teams a unified way to compare, edit, and apply equivalent ideas across providers: instructions, memory, MCP servers, skills, and custom agent definitions.
+Provider Config Sync keeps each provider's native config files intact while giving teams a unified way to compare, edit, and apply equivalent ideas across providers: instructions, memory, MCP servers, skills, and custom agent definitions.
 
-It is built for the messy reality of multi-provider agent workflows: every CLI has its own file layout, config syntax, and extension points. Provider Sync abstracts those differences without hiding them, so you can standardize what should be shared and preserve provider-specific power where it matters.
+It is built for the messy reality of multi-provider agent workflows: every CLI has its own file layout, config syntax, and extension points. Provider Config Sync abstracts those differences without hiding them, so you can standardize what should be shared and preserve provider-specific power where it matters.
 
 ## Why It Exists
 
@@ -20,12 +20,12 @@ AI coding agents are becoming operating environments. Teams now carry important 
 
 The problem: those files represent the same ideas in different formats.
 
-Provider Sync gives those ideas names, tracks a unified version, and shows each provider-specific version side by side so changes can move in either direction.
+Provider Config Sync gives those ideas names, tracks a unified version, and shows each provider-specific version side by side so changes can move in either direction.
 
 ## What You Get
 
 - **Unified ideas, native files**
-  Keep Claude, Codex, and Gemini using their own real config files. Provider Sync never replaces the provider-native configuration system.
+  Keep Claude, Codex, and Gemini using their own real config files. Provider Config Sync never replaces the provider-native configuration system.
 
 - **Bidirectional sync**
   Apply changes from unified to provider-specific files, or pull provider-specific changes back into unified tracking.
@@ -60,12 +60,12 @@ Provider Sync gives those ideas names, tracks a unified version, and shows each 
 
 ```text
 packages/
-  provider-sync-backend/
-    src/provider_sync_backend/
+  provider-config-sync-backend/
+    src/provider_config_sync_backend/
       api.py          # discovery, conversion, apply/write API
       standalone.py   # standalone FastAPI app + CLI entrypoint
 
-  provider-sync-core/
+  provider-config-sync-core/
     src/
       diff.ts         # aligned diff rows, hunks, line/block apply helpers
       items.ts        # normalized item parsing helpers
@@ -76,19 +76,19 @@ packages/
 Clone and install the standalone backend:
 
 ```bash
-git clone https://github.com/ofekron/provider-sync.git
-cd provider-sync
+git clone https://github.com/ofekron/provider-config-sync.git
+cd provider-config-sync
 
 python -m venv .venv
 . .venv/bin/activate
-pip install -e "packages/provider-sync-backend[server]"
+pip install -e "packages/provider-config-sync-backend[server]"
 ```
 
 Create a config file:
 
 ```json
 {
-  "sync_home": "~/.provider-sync",
+  "sync_home": "~/.provider-config-sync",
   "providers": [
     { "id": "claude", "name": "Claude", "kind": "claude", "config_dir": "~/.claude" },
     { "id": "codex", "name": "Codex", "kind": "codex", "config_dir": "~/.codex" },
@@ -103,13 +103,13 @@ Create a config file:
 Run the API:
 
 ```bash
-PROVIDER_SYNC_CONFIG=./provider-sync.json provider-sync-backend
+PROVIDER_CONFIG_SYNC_CONFIG=./provider-config-sync.json provider-config-sync-backend
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8765/api/provider-sync?cwd=/absolute/path/to/your/project
+http://127.0.0.1:8765/api/provider-config-sync?cwd=/absolute/path/to/your/project
 ```
 
 Verify the standalone package:
@@ -123,14 +123,14 @@ python tests/test_standalone_package.py
 The standalone app mounts:
 
 ```text
-GET    /api/provider-sync
-PUT    /api/provider-sync/file
-POST   /api/provider-sync/apply
-POST   /api/provider-sync/unified-item
-DELETE /api/provider-sync/unified-item
+GET    /api/provider-config-sync
+PUT    /api/provider-config-sync/file
+POST   /api/provider-config-sync/apply
+POST   /api/provider-config-sync/unified-item
+DELETE /api/provider-config-sync/unified-item
 ```
 
-Use `GET /api/provider-sync?cwd=...` to discover ideas and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, diff status, and provider metadata.
+Use `GET /api/provider-config-sync?cwd=...` to discover ideas and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, diff status, and provider metadata.
 
 ## Library Usage
 
@@ -138,7 +138,7 @@ Backend:
 
 ```python
 from pathlib import Path
-from provider_sync_backend.api import configure, router
+from provider_config_sync_backend.api import configure, router
 
 configure(
     provider_records=lambda: [
@@ -146,15 +146,15 @@ configure(
         {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": "~/.codex"},
     ],
     project_records=lambda: [{"path": "/repo", "node_id": "primary"}],
-    sync_home=lambda: Path("~/.provider-sync").expanduser(),
+    sync_home=lambda: Path("~/.provider-config-sync").expanduser(),
 )
 ```
 
 Frontend:
 
 ```ts
-import { buildAlignedDiffRows } from "@better-agent/provider-sync-core/diff";
-import { parseMcpServers } from "@better-agent/provider-sync-core/items";
+import { buildAlignedDiffRows } from "@better-agent/provider-config-sync-core/diff";
+import { parseMcpServers } from "@better-agent/provider-config-sync-core/items";
 ```
 
 ## Design Principles

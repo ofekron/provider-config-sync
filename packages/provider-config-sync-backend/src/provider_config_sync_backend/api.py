@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/provider-sync", tags=["provider-sync"])
+router = APIRouter(prefix="/api/provider-config-sync", tags=["provider-config-sync"])
 
 _KNOWN_KINDS = {"claude", "gemini", "codex"}
 _DEFAULT_CONFIG_DIR = {
@@ -50,7 +50,7 @@ _lock = threading.Lock()
 
 
 def _default_sync_home() -> Path:
-    raw = os.environ.get("PROVIDER_SYNC_HOME") or "~/.provider-sync"
+    raw = os.environ.get("PROVIDER_CONFIG_SYNC_HOME") or "~/.provider-config-sync"
     return _expand_path(raw)
 
 
@@ -1228,12 +1228,12 @@ def _idea_unified_path(
     project_root: Path | None,
 ) -> Path:
     if scope == "global":
-        root = _sync_home_source() / "provider-sync" / "global"
+        root = _sync_home_source() / "provider-config-sync" / "global"
     else:
         if project_root is None:
             raise HTTPException(status_code=400, detail="project idea requires project root")
         digest = hashlib.sha256(str(project_root).encode("utf-8")).hexdigest()
-        root = _sync_home_source() / "provider-sync" / "projects" / digest
+        root = _sync_home_source() / "provider-config-sync" / "projects" / digest
     return root / category / f"{idea_id}.{_idea_extension(language)}"
 
 
@@ -1723,7 +1723,7 @@ def _idea_for_tool(cwd: str, idea_id: str, scope: str | None = None) -> dict:
     for idea in matches:
         if scope is None:
             return idea
-    raise HTTPException(status_code=400, detail=f"unknown provider sync idea: {idea_id}")
+    raise HTTPException(status_code=400, detail=f"unknown provider config sync idea: {idea_id}")
 
 
 def _current_unified_for_tool(cwd: str, idea_id: str, scope: str | None = None) -> tuple[dict, str, bool]:

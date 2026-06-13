@@ -1,5 +1,5 @@
 {
-  "name": "@better-agent/provider-sync-core",
+  "name": "@better-agent/provider-config-sync-core",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",

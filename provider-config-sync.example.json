@@ -1,5 +1,5 @@
 {
-  "sync_home": "~/.provider-sync",
+  "sync_home": "~/.provider-config-sync",
   "providers": [
     { "id": "claude", "name": "Claude", "kind": "claude", "config_dir": "~/.claude" },
     { "id": "codex", "name": "Codex", "kind": "codex", "config_dir": "~/.codex" },
