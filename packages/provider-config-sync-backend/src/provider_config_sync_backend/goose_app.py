@@ -26,11 +26,13 @@ def goose_app_html() -> str:
       --bad: #ff7b72;
     }
     * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
     body {
       margin: 0;
       background: var(--bg);
       color: var(--text);
       font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
     }
     body.light {
       --bg: #f6f7f9;
@@ -41,7 +43,12 @@ def goose_app_html() -> str:
       --muted: #59636f;
       --accent: #0969da;
     }
-    .shell { display: grid; grid-template-rows: auto 1fr; min-height: 520px; }
+    .shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100dvh;
+      min-height: 520px;
+    }
     header {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -59,6 +66,7 @@ def goose_app_html() -> str:
       background: var(--panel-2);
       color: var(--text);
       font: inherit;
+      min-width: 0;
     }
     input, textarea, select { width: 100%; padding: 8px; }
     textarea {
@@ -78,6 +86,7 @@ def goose_app_html() -> str:
       display: grid;
       grid-template-columns: 310px minmax(0, 1fr);
       min-height: 0;
+      overflow: hidden;
     }
     aside {
       min-height: 0;
@@ -142,9 +151,79 @@ def goose_app_html() -> str:
     .status { min-height: 20px; color: var(--muted); }
     .error { color: var(--bad); }
     @media (max-width: 760px) {
-      header { grid-template-columns: 1fr; }
-      .main, .grid { grid-template-columns: 1fr; }
-      aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 320px; }
+      body { overflow: auto; }
+      .shell {
+        display: block;
+        height: auto;
+        min-height: 100dvh;
+      }
+      header {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
+      }
+      header button { width: 100%; }
+      .main {
+        display: block;
+        overflow: visible;
+      }
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        overflow: visible;
+      }
+      .stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding: 8px;
+      }
+      .stat { padding: 7px; }
+      .stat b { font-size: 14px; }
+      .list {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 8px;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+      }
+      .cap {
+        min-width: min(78vw, 280px);
+        scroll-snap-align: start;
+      }
+      .content {
+        overflow: visible;
+        padding: 10px;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .panel-head {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .panel-head > div { min-width: 0; }
+      .panel-head button { width: 100%; }
+      textarea {
+        min-height: 220px;
+        max-height: 52dvh;
+      }
+      .entries { gap: 8px; }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .row button { width: 100%; }
+    }
+    @media (max-width: 420px) {
+      h1 { font-size: 15px; }
+      .cap { min-width: 86vw; }
+      .row { grid-template-columns: 1fr; }
+      button { white-space: normal; }
+    }
+    @media (max-width: 340px) {
+      .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -431,6 +510,7 @@ def goose_app_html() -> str:
     $("reset").onclick = () => { $("content").value = state.original; renderTargets(); };
     $("content").oninput = renderTargets;
     $("entrySelect").onchange = event => selectEntry(event.target.value);
+    window.addEventListener("resize", () => app.resize());
     app.init().then(load);
   </script>
 </body>

@@ -163,6 +163,8 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
     check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
     check('"reset").onclick = () => { $("content").value = state.original; renderTargets(); }' in content.content, "Goose GUI reset restores apply buttons")
+    check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "Goose GUI has mobile layout rules")
+    check('window.addEventListener("resize", () => app.resize())' in content.content, "Goose GUI notifies host after viewport changes")
     result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))
     check(result.structuredContent["cwd"] == "/repo", "Goose GUI tool returns requested project path")
 
