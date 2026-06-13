@@ -40,12 +40,15 @@ _MEMORY_IDEA_ID = "memory"
 _MEMORY_IDEA_NAME = "Memory"
 _SKILL_IDEA_PREFIX = "skill-"
 _AGENT_IDEA_PREFIX = "agent-"
+_COMMAND_IDEA_PREFIX = "command-"
 _CONTENT_FILE = "file"
 _CONTENT_JSON_MCP = "json_mcp"
 _CONTENT_TOML_MCP = "toml_mcp"
 _CONTENT_MARKDOWN_SKILL = "markdown_skill"
 _CONTENT_MARKDOWN_AGENT = "markdown_agent"
 _CONTENT_TOML_AGENT = "toml_agent"
+_CONTENT_MARKDOWN_COMMAND = "markdown_command"
+_CONTENT_TOML_COMMAND = "toml_command"
 _lock = threading.Lock()
 
 
@@ -581,6 +584,45 @@ def _agent_idea_name(name: str) -> str:
     return f"Custom agent: {name}"
 
 
+def _command_roots_for_provider(
+    provider: dict,
+    scope: str,
+    project_root: Path | None = None,
+) -> list[Path]:
+    kind = provider["kind"]
+    if scope == "global":
+        if kind == "claude":
+            return [_provider_config_dir(provider) / "commands"]
+        if kind == "gemini":
+            return [_provider_config_dir(provider) / "commands"]
+        if kind == "codex":
+            return [_codex_home(provider) / "prompts"]
+        return []
+    if project_root is None:
+        return []
+    if kind == "claude":
+        return [project_root / ".claude" / "commands"]
+    if kind == "gemini":
+        return [project_root / ".gemini" / "commands"]
+    return []
+
+
+def _command_content_kind(provider_kind: str) -> str:
+    return _CONTENT_TOML_COMMAND if provider_kind == "gemini" else _CONTENT_MARKDOWN_COMMAND
+
+
+def _command_suffix(provider_kind: str) -> str:
+    return ".toml" if provider_kind == "gemini" else ".md"
+
+
+def _command_idea_id(name: str) -> str:
+    return f"{_COMMAND_IDEA_PREFIX}{_safe_agent_filename(name)}"
+
+
+def _command_idea_name(name: str) -> str:
+    return f"Command: /{name}"
+
+
 def _frontmatter_split(path: Path, content: str) -> tuple[dict, str]:
     normalized = content.replace("\r\n", "\n")
     if not normalized.startswith("---\n"):
@@ -613,6 +655,30 @@ def _normalized_item_payload(
         raise HTTPException(status_code=400, detail=f"{item_label} description must be a non-empty string: {path}")
     if not isinstance(instructions, str) or not instructions.strip():
         raise HTTPException(status_code=400, detail=f"{item_label} instructions must be a non-empty string: {path}")
+    return {
+        "name": name.strip(),
+        "description": description.strip(),
+        "instructions": instructions.strip() + "\n",
+        "metadata": metadata,
+    }
+
+
+def _normalized_command_payload(
+    *,
+    path: Path,
+    name: object,
+    description: object,
+    instructions: object,
+    metadata: dict,
+) -> dict:
+    if not isinstance(name, str) or not name.strip():
+        raise HTTPException(status_code=400, detail=f"command name must be a non-empty string: {path}")
+    if description is None:
+        description = ""
+    if not isinstance(description, str):
+        raise HTTPException(status_code=400, detail=f"command description must be a string: {path}")
+    if not isinstance(instructions, str) or not instructions.strip():
+        raise HTTPException(status_code=400, detail=f"command instructions must be a non-empty string: {path}")
     return {
         "name": name.strip(),
         "description": description.strip(),
@@ -657,6 +723,23 @@ def _markdown_skill_payload(path: Path, content: str) -> dict:
     )
 
 
+def _markdown_command_payload(path: Path, content: str) -> dict:
+    metadata: dict = {}
+    description = ""
+    body = content
+    if content.replace("\r\n", "\n").startswith("---\n"):
+        data, body = _frontmatter_split(path, content)
+        metadata = {k: v for k, v in data.items() if k != "description"}
+        description = data.get("description") or ""
+    return _normalized_command_payload(
+        path=path,
+        name=path.stem,
+        description=description,
+        instructions=body,
+        metadata=metadata,
+    )
+
+
 def _toml_agent_payload(path: Path, content: str) -> dict:
     data = _toml_object_from_text(path, content)
     metadata = {k: v for k, v in data.items() if k not in {"name", "description", "developer_instructions"}}
@@ -666,6 +749,18 @@ def _toml_agent_payload(path: Path, content: str) -> dict:
         name=data.get("name"),
         description=data.get("description"),
         instructions=data.get("developer_instructions"),
+        metadata=metadata,
+    )
+
+
+def _toml_command_payload(path: Path, content: str) -> dict:
+    data = _toml_object_from_text(path, content)
+    metadata = {k: v for k, v in data.items() if k not in {"description", "prompt"}}
+    return _normalized_command_payload(
+        path=path,
+        name=path.stem,
+        description=data.get("description") or "",
+        instructions=data.get("prompt"),
         metadata=metadata,
     )
 
@@ -680,6 +775,14 @@ def _item_payload_from_normalized(content: str, item_label: str) -> dict:
     metadata = value.get("metadata") or {}
     if not isinstance(metadata, dict):
         raise HTTPException(status_code=400, detail="metadata must be an object")
+    if item_label == "command":
+        return _normalized_command_payload(
+            path=Path("<command>"),
+            name=value.get("name"),
+            description=value.get("description"),
+            instructions=value.get("instructions"),
+            metadata=metadata,
+        )
     return _normalized_item_payload(
         item_label=item_label,
         path=Path(f"<{item_label}>"),
@@ -766,6 +869,72 @@ def _agent_candidates(
                     "json",
                     True,
                     _agent_content_kind(kind),
+                )
+            )
+    return candidates
+
+
+def _command_names_in_root(root: Path, suffix: str) -> set[str]:
+    if not root.is_dir() or root.is_symlink():
+        return set()
+    return {
+        path.stem
+        for path in root.iterdir()
+        if path.is_file()
+        and not path.is_symlink()
+        and path.suffix == suffix
+        and path.stem not in {"", ".", ".."}
+        and Path(path.stem).name == path.stem
+    }
+
+
+def _command_names(providers: list[dict], scope: str, project_root: Path | None = None) -> set[str]:
+    names: set[str] = set()
+    for provider in providers:
+        suffix = _command_suffix(provider["kind"])
+        for root in _command_roots_for_provider(provider, scope, project_root):
+            names.update(_command_names_in_root(root, suffix))
+    return names
+
+
+def _candidate_command_paths(provider: dict, roots: list[Path], name: str) -> list[Path]:
+    suffix = _command_suffix(provider["kind"])
+    existing = [
+        root / f"{name}{suffix}"
+        for root in roots
+        if (root / f"{name}{suffix}").is_file()
+        and not (root / f"{name}{suffix}").is_symlink()
+    ]
+    if existing:
+        return existing
+    return [roots[0] / f"{_safe_agent_filename(name)}{suffix}"] if roots else []
+
+
+def _command_candidates(
+    provider: dict,
+    scope: str,
+    names: set[str],
+    project_root: Path | None = None,
+) -> list[Candidate]:
+    kind = provider["kind"]
+    provider_name = provider.get("name") or kind
+    roots = _command_roots_for_provider(provider, scope, project_root)
+    candidates: list[Candidate] = []
+    for command_name in sorted(names):
+        for path in _candidate_command_paths(provider, roots, command_name):
+            candidates.append(
+                Candidate(
+                    path,
+                    scope,
+                    "command",
+                    _command_idea_id(command_name),
+                    _command_idea_name(command_name),
+                    kind,
+                    provider_name,
+                    f"{provider_name} command",
+                    "json",
+                    True,
+                    _command_content_kind(kind),
                 )
             )
     return candidates
@@ -1101,6 +1270,20 @@ def _toml_agent_current(path: Path) -> tuple[str, bool]:
     return _normalized_item_text(_toml_agent_payload(path, content)), True
 
 
+def _markdown_command_current(path: Path) -> tuple[str, bool]:
+    content = _read_existing_text(path)
+    if content is None:
+        return "", False
+    return _normalized_item_text(_markdown_command_payload(path, content)), True
+
+
+def _toml_command_current(path: Path) -> tuple[str, bool]:
+    content = _read_existing_text(path)
+    if content is None:
+        return "", False
+    return _normalized_item_text(_toml_command_payload(path, content)), True
+
+
 def _file_current(path: Path) -> tuple[str, bool]:
     content = _read_existing_text(path)
     return content or "", content is not None
@@ -1204,7 +1387,7 @@ def _idea_key(scope: str, category: str, idea_id: str) -> str:
 def _idea_language(category: str, specifics: list[dict]) -> str:
     if category in {"instructions", "memory"}:
         return "markdown"
-    if category in {"agent", "skill"}:
+    if category in {"agent", "skill", "command"}:
         return "json"
     languages = {entry["language"] for entry in specifics}
     if len(languages) == 1:
@@ -1310,12 +1493,14 @@ def _discover(cwd: str) -> dict:
     providers = _provider_records()
     global_skill_names = _global_skill_names(providers)
     global_agent_names = _agent_names(providers, "global")
+    global_command_names = _command_names(providers, "global")
     for provider in providers:
         for candidate in [
             *_global_instruction_candidates(provider),
             *_global_config_candidates(provider),
             *_global_skill_candidates(provider, global_skill_names),
             *_agent_candidates(provider, "global", global_agent_names),
+            *_command_candidates(provider, "global", global_command_names),
         ]:
             _entry_from_candidates(candidate, by_entry)
 
@@ -1327,6 +1512,7 @@ def _discover(cwd: str) -> dict:
         if project_root is not None:
             project_skill_slots = _project_skill_slots(providers, project_root, cwd)
             project_agent_names = _agent_names(providers, "project", project_root)
+            project_command_names = _command_names(providers, "project", project_root)
             for provider in providers:
                 candidates = [
                     *_project_instruction_candidates(provider, project_root, cwd),
@@ -1334,6 +1520,7 @@ def _discover(cwd: str) -> dict:
                     *_project_config_candidates(provider, project_root),
                     *_project_skill_candidates(provider, project_root, cwd, project_skill_slots),
                     *_agent_candidates(provider, "project", project_agent_names, project_root),
+                    *_command_candidates(provider, "project", project_command_names, project_root),
                 ]
                 for candidate in candidates:
                     _entry_from_candidates(candidate, by_entry)
@@ -1600,6 +1787,30 @@ def _toml_agent_from_normalized(content: str) -> str:
     return _toml_dumps(data)
 
 
+def _markdown_command_from_normalized(content: str) -> str:
+    payload = _item_payload_from_normalized(content, "command")
+    metadata = payload.get("metadata") or {}
+    frontmatter = {
+        **({"description": payload["description"]} if payload.get("description") else {}),
+        **metadata,
+    }
+    body = payload["instructions"].rstrip() + "\n"
+    if not frontmatter:
+        return body
+    yaml_text = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True).strip()
+    return f"---\n{yaml_text}\n---\n{body}"
+
+
+def _toml_command_from_normalized(content: str) -> str:
+    payload = _item_payload_from_normalized(content, "command")
+    data = {
+        **({"description": payload["description"]} if payload.get("description") else {}),
+        "prompt": payload["instructions"].rstrip() + "\n",
+        **(payload.get("metadata") or {}),
+    }
+    return _toml_dumps(data)
+
+
 def _write_markdown_agent_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
     original = _read_existing_text(path)
     current = _normalized_item_text(_markdown_agent_payload(path, original)) if original is not None else None
@@ -1624,6 +1835,22 @@ def _write_toml_agent_if_unchanged(path: Path, expected: str | None, content: st
     _write_if_unchanged(path, original, _toml_agent_from_normalized(content), category)
 
 
+def _write_markdown_command_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
+    original = _read_existing_text(path)
+    current = _normalized_item_text(_markdown_command_payload(path, original)) if original is not None else None
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before saving")
+    _write_if_unchanged(path, original, _markdown_command_from_normalized(content), category)
+
+
+def _write_toml_command_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
+    original = _read_existing_text(path)
+    current = _normalized_item_text(_toml_command_payload(path, original)) if original is not None else None
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before saving")
+    _write_if_unchanged(path, original, _toml_command_from_normalized(content), category)
+
+
 def _write_file_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
     _write_if_unchanged(path, expected, content, category)
 
@@ -1636,6 +1863,8 @@ def _content_adapter(content_kind: str) -> ContentAdapter:
         _CONTENT_MARKDOWN_SKILL: ContentAdapter(_markdown_skill_current, _write_markdown_skill_if_unchanged),
         _CONTENT_MARKDOWN_AGENT: ContentAdapter(_markdown_agent_current, _write_markdown_agent_if_unchanged),
         _CONTENT_TOML_AGENT: ContentAdapter(_toml_agent_current, _write_toml_agent_if_unchanged),
+        _CONTENT_MARKDOWN_COMMAND: ContentAdapter(_markdown_command_current, _write_markdown_command_if_unchanged),
+        _CONTENT_TOML_COMMAND: ContentAdapter(_toml_command_current, _write_toml_command_if_unchanged),
     }
     adapter = adapters.get(content_kind)
     if adapter is None:
@@ -1746,6 +1975,15 @@ def _normalized_common_item_from_tool(idea: dict, item: dict[str, Any], item_nam
     metadata = item.get("metadata") or {}
     if not isinstance(metadata, dict):
         raise HTTPException(status_code=400, detail="metadata must be an object")
+    if idea["category"] == "command":
+        payload = _normalized_command_payload(
+            path=Path("<command>"),
+            name=item.get("name") or item_name,
+            description=item.get("description"),
+            instructions=item.get("instructions"),
+            metadata=metadata,
+        )
+        return _normalized_item_text(payload)
     payload = _normalized_item_payload(
         item_label=idea["category"],
         path=Path(f"<{idea['category']}>"),
@@ -1779,7 +2017,7 @@ async def upsert_unified_item(req: UpsertUnifiedItemRequest):
         content = _mcp_tool_content(current, exists)
         content["mcpServers"][name] = item
         next_content = json.dumps(content, indent=2, sort_keys=True) + "\n"
-    elif idea["category"] in {"agent", "skill"}:
+    elif idea["category"] in {"agent", "skill", "command"}:
         next_content = _normalized_common_item_from_tool(idea, req.item, req.item_name)
     else:
         raise HTTPException(status_code=400, detail=f"idea does not support item edits: {idea['category']}")

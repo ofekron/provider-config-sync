@@ -11,6 +11,7 @@ import json
 import shutil
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
@@ -123,9 +124,87 @@ def t_standalone_app_loads_json_config() -> None:
         shutil.rmtree(wipe)
 
 
+def t_standalone_commands_convert_provider_formats() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-commands-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        claude_command = project / ".claude" / "commands" / "review.md"
+        claude_command.parent.mkdir(parents=True)
+        claude_command.write_text(
+            "---\n"
+            "description: Review code\n"
+            "allowed-tools: Read, Grep\n"
+            "---\n"
+            "Review the changed files.\n",
+            encoding="utf-8",
+        )
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")},
+                {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": str(wipe / "gemini")},
+                {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": str(wipe / "codex")},
+            ],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+
+        payload = api._discover(str(project))
+        command = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "command-review")
+        by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
+        check(set(by_kind) == {"claude", "gemini"}, "project commands offer Claude and Gemini targets")
+        check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Grep", "Claude command metadata is normalized")
+
+        asyncio.run(
+            api.apply_native_file(
+                api.ApplyNativeFileRequest(
+                    cwd=str(project),
+                    idea_id="command-review",
+                    source_entry_id=by_kind["claude"]["entry_id"],
+                    target_entry_id=command["unified"]["entry_id"],
+                    expected_source=by_kind["claude"]["content"],
+                    expected_target=None,
+                )
+            )
+        )
+        payload = api._discover(str(project))
+        command = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "command-review")
+        by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
+        asyncio.run(
+            api.apply_native_file(
+                api.ApplyNativeFileRequest(
+                    cwd=str(project),
+                    idea_id="command-review",
+                    source_entry_id=command["unified"]["entry_id"],
+                    target_entry_id=by_kind["gemini"]["entry_id"],
+                    expected_source=command["unified"]["content"],
+                    expected_target=None,
+                )
+            )
+        )
+        gemini_command = project / ".gemini" / "commands" / "review.toml"
+        gemini_data = tomllib.loads(gemini_command.read_text(encoding="utf-8"))
+        check(gemini_data["description"] == "Review code", "Gemini command gets description")
+        check(gemini_data["prompt"] == "Review the changed files.\n", "Gemini command gets prompt")
+
+        payload = api._discover("")
+        check("command-review" not in {idea["idea_id"] for idea in payload["groups"]["global"]}, "global command absent before Codex prompt exists")
+        codex_prompt = wipe / "codex" / "prompts" / "review.md"
+        codex_prompt.parent.mkdir(parents=True)
+        codex_prompt.write_text("Review the worktree.\n", encoding="utf-8")
+        payload = api._discover("")
+        global_command = next(idea for idea in payload["groups"]["global"] if idea["idea_id"] == "command-review")
+        by_kind = {entry["provider_kinds"][0]: entry for entry in global_command["specifics"]}
+        check("codex" in by_kind, "Codex custom prompt appears as global command")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
+    t_standalone_commands_convert_provider_formats()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")
         for failure in FAILURES:

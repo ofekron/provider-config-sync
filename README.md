@@ -6,7 +6,7 @@
 
 **One control plane for AI-agent configuration across Claude, Codex, and Gemini.**
 
-Provider Config Sync keeps each provider's native config files intact while giving teams a unified way to compare, edit, and apply equivalent ideas across providers: instructions, memory, MCP servers, skills, and custom agent definitions.
+Provider Config Sync keeps each provider's native config files intact while giving teams a unified way to compare, edit, and apply equivalent capabilities across providers: instructions, memory, MCP servers, skills, commands, and custom agent definitions.
 
 It is built for the messy reality of multi-provider agent workflows: every CLI has its own file layout, config syntax, and extension points. Provider Config Sync abstracts those differences without hiding them, so you can standardize what should be shared and preserve provider-specific power where it matters.
 
@@ -26,11 +26,11 @@ That makes these files worth editing deliberately, even manually. Teams now carr
 
 The problem: those files represent the same ideas in different formats.
 
-Provider Config Sync gives those ideas names, tracks a unified version, and shows each provider-specific version side by side so changes can move in either direction.
+Provider Config Sync gives those capabilities names, tracks a unified version, and shows each provider-specific version side by side so changes can move in either direction.
 
 ## What You Get
 
-- **Unified ideas, native files**
+- **Unified capabilities, native files**
   Keep Claude, Codex, and Gemini using their own real config files. Provider Config Sync never replaces the provider-native configuration system.
 
 - **Bidirectional sync**
@@ -51,14 +51,15 @@ Provider Config Sync gives those ideas names, tracks a unified version, and show
 - **Safer writes**
   Writes use expected-content checks, atomic creation, and first-write backups to avoid silent clobbering.
 
-## Supported Ideas
+## Supported Capabilities
 
-| Idea | Claude | Codex | Gemini |
+| Capability | Claude | Codex | Gemini |
 | --- | --- | --- | --- |
 | General instructions | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` or configured context file |
 | Project memory | Claude project memory | unified idea tracking | unified idea tracking |
 | MCP servers | `.mcp.json` / settings | `config.toml` | `settings.json` |
 | Skills | `.claude/skills` | `.agents/skills` | `.agents/skills` / `.gemini/skills` |
+| Commands | `.claude/commands/*.md` | `~/.codex/prompts/*.md` | `.gemini/commands/*.toml` |
 | Custom agents | Markdown frontmatter | TOML | Markdown frontmatter |
 | Provider settings | JSON/settings | TOML | JSON/settings |
 
