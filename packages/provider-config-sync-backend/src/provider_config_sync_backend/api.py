@@ -1301,6 +1301,17 @@ def _file_mode(category: str) -> int:
     return 0o600 if category == "config" else 0o644
 
 
+_TOKEN_RE = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+
+
+def _estimate_tokens(content: str) -> int:
+    if not content.strip():
+        return 0
+    lexical = len(_TOKEN_RE.findall(content))
+    char_floor = math.ceil(len(content) / 4)
+    return max(1, lexical, char_floor)
+
+
 def _entry_id_from_candidate(candidate: Candidate) -> str:
     path = candidate.path.absolute()
     return ":".join(
@@ -1318,6 +1329,7 @@ def _entry_from_candidate(candidate: Candidate) -> dict:
     path = candidate.path.absolute()
     path_key = str(path)
     content, error, exists = _read_candidate_content(candidate)
+    token_count = _estimate_tokens(content) if exists and error is None else 0
     return {
         "entry_id": _entry_id_from_candidate(candidate),
         "path": path_key,
@@ -1331,6 +1343,7 @@ def _entry_from_candidate(candidate: Candidate) -> dict:
         "label": candidate.label,
         "language": candidate.language,
         "content": content,
+        "token_count": token_count,
         "exists": exists,
         "read_error": error,
         "writable": error is None and (exists or candidate.can_create),
@@ -1365,6 +1378,7 @@ def _merge_entry(entry: dict, by_entry: dict[str, dict]) -> None:
     if entry["exists"]:
         current["exists"] = True
         current["content"] = entry["content"]
+        current["token_count"] = entry["token_count"]
     if entry["writable"] and not current["read_error"]:
         current["writable"] = True
     for provider_name in entry["provider_names"]:
@@ -1431,6 +1445,7 @@ def _unified_entry(
 ) -> dict:
     path = _capability_unified_path(scope, category, capability_id, language, project_root).absolute()
     content, error, exists = _read_entry_content(path)
+    token_count = _estimate_tokens(content) if exists and error is None else 0
     entry_id = ":".join(["unified", scope, category, capability_id, str(path)])
     return {
         "entry_id": entry_id,
@@ -1445,6 +1460,7 @@ def _unified_entry(
         "label": f"{capability_name} unified",
         "language": language,
         "content": content,
+        "token_count": token_count,
         "exists": exists,
         "read_error": error,
         "writable": error is None,
@@ -1472,6 +1488,8 @@ def _capability_from_specifics(
         language=language,
         project_root=project_root,
     )
+    provider_token_counts = _provider_token_counts(specifics)
+    specific_token_count = sum(entry["token_count"] for entry in specifics)
     return {
         "id": _capability_key(scope, category, capability_id),
         "capability_id": capability_id,
@@ -1481,9 +1499,44 @@ def _capability_from_specifics(
         "language": language,
         "unified": unified,
         "specifics": specifics,
+        "unified_token_count": unified["token_count"],
+        "specific_token_count": specific_token_count,
+        "total_token_count": unified["token_count"] + specific_token_count,
+        "provider_token_counts": provider_token_counts,
         "has_diffs": any(entry["content"] != unified["content"] for entry in specifics),
         "specific_count": len(specifics),
         "missing_count": sum(1 for entry in specifics if not entry["exists"]),
+    }
+
+
+def _provider_token_counts(entries: list[dict]) -> list[dict]:
+    by_key: dict[tuple[str, str], int] = {}
+    for entry in entries:
+        for provider_kind, provider_name in zip(entry["provider_kinds"], entry["provider_names"], strict=False):
+            key = (provider_kind, provider_name)
+            by_key[key] = by_key.get(key, 0) + entry["token_count"]
+    return [
+        {"provider_kind": kind, "provider_name": name, "token_count": count}
+        for (kind, name), count in sorted(by_key.items(), key=lambda item: (item[0][0], item[0][1]))
+    ]
+
+
+def _token_totals(capabilities: list[dict]) -> dict:
+    unified = sum(capability["unified_token_count"] for capability in capabilities)
+    specifics = sum(capability["specific_token_count"] for capability in capabilities)
+    provider_counts: dict[tuple[str, str], int] = {}
+    for capability in capabilities:
+        for item in capability["provider_token_counts"]:
+            key = (item["provider_kind"], item["provider_name"])
+            provider_counts[key] = provider_counts.get(key, 0) + item["token_count"]
+    return {
+        "unified": unified,
+        "specifics": specifics,
+        "all_tracked": unified + specifics,
+        "by_provider": [
+            {"provider_kind": kind, "provider_name": name, "token_count": count}
+            for (kind, name), count in sorted(provider_counts.items(), key=lambda item: (item[0][0], item[0][1]))
+        ],
     }
 
 
@@ -1557,6 +1610,7 @@ def _discover(cwd: str) -> dict:
     return {
         "files": files,
         "capabilities": capabilities,
+        "token_totals": _token_totals(capabilities),
         "groups": {
             scope: [
                 capability

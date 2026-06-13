@@ -42,6 +42,9 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
 - **Provider extensions stay visible**
   Common fields can be managed consistently, while provider-only metadata remains editable instead of being discarded.
 
+- **Token visibility**
+  Estimate config tokens per provider file, per unified capability, and across the whole project so config cost is visible.
+
 - **Standalone backend**
   Run the sync engine as a standalone FastAPI service without Better Claude.
 
@@ -183,7 +186,7 @@ POST   /api/provider-config-sync/unified-capability-item
 DELETE /api/provider-config-sync/unified-capability-item
 ```
 
-Use `GET /api/provider-config-sync?cwd=...` to discover capabilities and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, diff status, and provider metadata.
+Use `GET /api/provider-config-sync?cwd=...` to discover capabilities and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, estimated token counts, diff status, and provider metadata.
 
 ## MCP Tools
 

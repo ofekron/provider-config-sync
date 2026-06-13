@@ -66,6 +66,13 @@ def t_standalone_project_mcp_roundtrip() -> None:
         by_kind = {entry["provider_kinds"][0]: entry for entry in mcp["specifics"]}
         check(set(by_kind) == {"claude", "gemini"}, "standalone discovery finds configured providers")
         check(str(sync_home) in mcp["unified"]["path"], "unified tracking lives under injected sync home")
+        check(by_kind["claude"]["token_count"] > 0, "provider-specific config token estimate is reported")
+        check(mcp["specific_token_count"] >= by_kind["claude"]["token_count"], "capability token estimate totals specifics")
+        check(
+            any(item["provider_kind"] == "claude" and item["token_count"] > 0 for item in mcp["provider_token_counts"]),
+            "capability token estimate is grouped by provider",
+        )
+        check(payload["token_totals"]["specifics"] >= mcp["specific_token_count"], "response token total includes capability specifics")
 
         asyncio.run(
             api.apply_native_file(

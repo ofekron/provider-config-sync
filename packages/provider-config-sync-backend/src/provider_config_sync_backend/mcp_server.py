@@ -43,11 +43,15 @@ def create_server() -> FastMCP:
                     "has_diffs": capability["has_diffs"],
                     "specific_count": capability["specific_count"],
                     "missing_count": capability["missing_count"],
+                    "unified_token_count": capability["unified_token_count"],
+                    "specific_token_count": capability["specific_token_count"],
+                    "total_token_count": capability["total_token_count"],
+                    "provider_token_counts": capability["provider_token_counts"],
                     "unified": _entry_summary(capability["unified"]),
                     "specifics": [_entry_summary(entry) for entry in capability["specifics"]],
                 }
             )
-        return {"capabilities": capabilities}
+        return {"capabilities": capabilities, "token_totals": payload["token_totals"]}
 
     @server.tool()
     def read_provider_config_entry(cwd: str = "", entry_id: str | None = None, path: str | None = None) -> dict[str, Any]:
@@ -160,6 +164,7 @@ def _entry_summary(entry: dict[str, Any]) -> dict[str, Any]:
         "exists": entry["exists"],
         "writable": entry["writable"],
         "read_error": entry["read_error"],
+        "token_count": entry["token_count"],
         "provider_names": entry["provider_names"],
         "provider_kinds": entry["provider_kinds"],
         "content_kind": entry["content_kind"],
