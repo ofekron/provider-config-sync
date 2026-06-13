@@ -41,6 +41,13 @@ def _records(value: object, label: str) -> list[dict]:
 
 
 def create_app(config_path: str | Path | None = None) -> FastAPI:
+    configure_from_file(config_path)
+    app = FastAPI(title="Provider Config Sync")
+    app.include_router(router)
+    return app
+
+
+def configure_from_file(config_path: str | Path | None = None) -> None:
     config = _read_config(config_path or os.environ.get("PROVIDER_CONFIG_SYNC_CONFIG"))
     providers = _records(config.get("providers"), "providers") or _default_providers()
     projects = _records(config.get("projects"), "projects")
@@ -50,9 +57,6 @@ def create_app(config_path: str | Path | None = None) -> FastAPI:
         project_records=lambda: projects,
         sync_home=lambda: sync_home,
     )
-    app = FastAPI(title="Provider Config Sync")
-    app.include_router(router)
-    return app
 
 
 app = create_app()

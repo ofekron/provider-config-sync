@@ -24,7 +24,7 @@ That makes these files worth editing deliberately, even manually. Teams now carr
 - skills and custom subagent definitions
 - project memory files
 
-The problem: those files represent the same ideas in different formats.
+The problem: those files represent the same capabilities in different formats.
 
 Provider Config Sync gives those capabilities names, tracks a unified version, and shows each provider-specific version side by side so changes can move in either direction.
 
@@ -45,6 +45,9 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
 - **Standalone backend**
   Run the sync engine as a standalone FastAPI service without Better Claude.
 
+- **Agent extension**
+  Expose the same sync engine as an MCP server for Goose and other MCP-capable agents.
+
 - **Reusable frontend core**
   Use the TypeScript diff/item helpers in your own UI.
 
@@ -56,7 +59,7 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
 | Capability | Claude | Codex | Gemini |
 | --- | --- | --- | --- |
 | General instructions | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` or configured context file |
-| Project memory | Claude project memory | unified idea tracking | unified idea tracking |
+| Project memory | Claude project memory | unified capability tracking | unified capability tracking |
 | MCP servers | `.mcp.json` / settings | `config.toml` | `settings.json` |
 | Skills | `.claude/skills` | `.agents/skills` | `.agents/skills` / `.gemini/skills` |
 | Commands | `.claude/commands/*.md` | `~/.codex/prompts/*.md` | `.gemini/commands/*.toml` |
@@ -80,7 +83,13 @@ packages/
 
 ## Quick Start
 
-Clone and install the standalone backend:
+Install the standalone package:
+
+```bash
+pipx install "better-agent-provider-config-sync-backend[all] @ git+https://github.com/ofekron/provider-config-sync.git#subdirectory=packages/provider-config-sync-backend"
+```
+
+Or clone and install locally:
 
 ```bash
 git clone https://github.com/ofekron/provider-config-sync.git
@@ -125,6 +134,43 @@ Verify the standalone package:
 python tests/test_standalone_package.py
 ```
 
+## Use With Agents
+
+Goose can install custom MCP servers as extensions. Add Provider Config Sync as a stdio extension:
+
+```text
+Name: Provider Config Sync
+Command: provider-config-sync-mcp
+Environment:
+  PROVIDER_CONFIG_SYNC_CONFIG=/absolute/path/to/provider-config-sync.json
+```
+
+Then ask Goose to inspect or sync agent config capabilities for the current project. The MCP server exposes tools to list capabilities, read files, edit files with conflict checks, apply unified-to-specific changes, pull provider-specific changes into unified tracking, and manage structured items such as MCP servers, skills, commands, and agents.
+
+For a local checkout, use:
+
+```text
+Command: /absolute/path/to/provider-config-sync/.venv/bin/provider-config-sync-mcp
+Environment:
+  PROVIDER_CONFIG_SYNC_CONFIG=/absolute/path/to/provider-config-sync/provider-config-sync.json
+```
+
+Install native commands/prompts into the providers themselves:
+
+```bash
+provider-config-sync-install-agent-integrations
+```
+
+That installs:
+
+```text
+~/.claude/commands/provider-config-sync.md
+~/.codex/prompts/provider-config-sync.md
+~/.gemini/commands/provider-config-sync.toml
+```
+
+Those commands tell Claude Code, Codex, and Gemini to use the unified capability form first, then apply the capability to the other configured providers.
+
 ## API Surface
 
 The standalone app mounts:
@@ -133,11 +179,24 @@ The standalone app mounts:
 GET    /api/provider-config-sync
 PUT    /api/provider-config-sync/file
 POST   /api/provider-config-sync/apply
-POST   /api/provider-config-sync/unified-item
-DELETE /api/provider-config-sync/unified-item
+POST   /api/provider-config-sync/unified-capability-item
+DELETE /api/provider-config-sync/unified-capability-item
 ```
 
-Use `GET /api/provider-config-sync?cwd=...` to discover ideas and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, diff status, and provider metadata.
+Use `GET /api/provider-config-sync?cwd=...` to discover capabilities and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, diff status, and provider metadata.
+
+## MCP Tools
+
+```text
+list_provider_config_capabilities
+read_provider_config_entry
+write_provider_config_entry
+apply_provider_config_entry
+upsert_unified_capability_item
+remove_unified_capability_item
+```
+
+Agents should list capabilities first, read the relevant entries, then pass the latest `expected_content` / `expected_source` / `expected_target` when writing or applying changes.
 
 ## Library Usage
 
@@ -167,7 +226,7 @@ import { parseMcpServers } from "@better-agent/provider-config-sync-core/items";
 ## Design Principles
 
 - **Native first**: providers keep reading their own files.
-- **Unified is a tracking layer**: it helps compare and propagate equivalent ideas; it is not a runtime replacement for provider config.
+- **Unified is a tracking layer**: it helps compare and propagate equivalent capabilities; it is not a runtime replacement for provider config.
 - **No silent overwrites**: writes require the expected previous content.
 - **Format abstraction, not format erasure**: common fields get a common UI shape, provider-specific metadata survives round trips.
 - **Portable core**: the backend package has no Better Claude dependency.

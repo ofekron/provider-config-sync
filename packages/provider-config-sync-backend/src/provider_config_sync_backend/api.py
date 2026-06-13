@@ -32,15 +32,15 @@ _DEFAULT_CONFIG_DIR = {
 }
 _BACKUP_SUFFIX = ".bc-sync-backup"
 _BACKUP_MARKER_SUFFIX = ".sha256"
-_MCP_IDEA_ID = "mcp"
-_MCP_IDEA_NAME = "MCP servers"
-_INSTRUCTIONS_IDEA_ID = "instructions"
-_INSTRUCTIONS_IDEA_NAME = "General instructions"
-_MEMORY_IDEA_ID = "memory"
-_MEMORY_IDEA_NAME = "Memory"
-_SKILL_IDEA_PREFIX = "skill-"
-_AGENT_IDEA_PREFIX = "agent-"
-_COMMAND_IDEA_PREFIX = "command-"
+_MCP_CAPABILITY_ID = "mcp"
+_MCP_CAPABILITY_NAME = "MCP servers"
+_INSTRUCTIONS_CAPABILITY_ID = "instructions"
+_INSTRUCTIONS_CAPABILITY_NAME = "General instructions"
+_MEMORY_CAPABILITY_ID = "memory"
+_MEMORY_CAPABILITY_NAME = "Memory"
+_SKILL_CAPABILITY_PREFIX = "skill-"
+_AGENT_CAPABILITY_PREFIX = "agent-"
+_COMMAND_CAPABILITY_PREFIX = "command-"
 _CONTENT_FILE = "file"
 _CONTENT_JSON_MCP = "json_mcp"
 _CONTENT_TOML_MCP = "toml_mcp"
@@ -64,7 +64,7 @@ def _default_encode_cwd(cwd: str) -> str:
 async def _noop_broadcast_changed(
     _scope: str,
     _category: str,
-    _idea_id: str,
+    _capability_id: str,
     _path: str,
     _cwd: str,
 ) -> None:
@@ -108,8 +108,8 @@ class Candidate:
     path: Path
     scope: str
     category: str
-    idea_id: str
-    idea_name: str
+    capability_id: str
+    capability_name: str
     provider_kind: str
     provider_name: str
     label: str
@@ -236,8 +236,8 @@ def _global_instruction_candidates(provider: dict) -> list[Candidate]:
                 _provider_config_dir(provider) / "CLAUDE.md",
                 "global",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 "Claude instructions",
@@ -251,8 +251,8 @@ def _global_instruction_candidates(provider: dict) -> list[Candidate]:
                 _provider_config_dir(provider) / filename,
                 "global",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 f"Gemini instructions ({filename})",
@@ -272,8 +272,8 @@ def _global_instruction_candidates(provider: dict) -> list[Candidate]:
                 path,
                 "global",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 f"Codex instructions ({path.name})",
@@ -299,8 +299,8 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
                 path,
                 "project",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 f"Claude instructions ({path.name})",
@@ -319,8 +319,8 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
                 path,
                 "project",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 f"Gemini instructions ({path.name})",
@@ -339,8 +339,8 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
                 path,
                 "project",
                 "instructions",
-                _INSTRUCTIONS_IDEA_ID,
-                _INSTRUCTIONS_IDEA_NAME,
+                _INSTRUCTIONS_CAPABILITY_ID,
+                _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
                 f"Codex instructions ({path.name})",
@@ -364,8 +364,8 @@ def _project_auto_memory_candidates(provider: dict, project_root: Path) -> list[
             path,
             "project",
             "memory",
-            _MEMORY_IDEA_ID,
-            _MEMORY_IDEA_NAME,
+            _MEMORY_CAPABILITY_ID,
+            _MEMORY_CAPABILITY_NAME,
             kind,
             name,
             "Claude auto memory",
@@ -453,17 +453,17 @@ def _project_skill_slots(providers: list[dict], project_root: Path, cwd: str) ->
     return slots
 
 
-def _skill_idea_id(rel: str, name: str) -> str:
+def _skill_capability_id(rel: str, name: str) -> str:
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", name).strip("-") or hashlib.sha256(
         name.encode("utf-8")
     ).hexdigest()[:8]
     if rel in {"", "."}:
-        return f"{_SKILL_IDEA_PREFIX}{safe_name}"
+        return f"{_SKILL_CAPABILITY_PREFIX}{safe_name}"
     digest = hashlib.sha256(rel.encode("utf-8")).hexdigest()[:8]
-    return f"{_SKILL_IDEA_PREFIX}{digest}-{safe_name}"
+    return f"{_SKILL_CAPABILITY_PREFIX}{digest}-{safe_name}"
 
 
-def _skill_idea_name(rel: str, name: str) -> str:
+def _skill_capability_name(rel: str, name: str) -> str:
     if rel in {"", "."}:
         return f"Skill: {name}"
     return f"Skill: {name} ({rel})"
@@ -493,8 +493,8 @@ def _global_skill_candidates(provider: dict, skill_names: set[str]) -> list[Cand
                     path,
                     "global",
                     "skill",
-                    _skill_idea_id("", skill_name),
-                    _skill_idea_name("", skill_name),
+                    _skill_capability_id("", skill_name),
+                    _skill_capability_name("", skill_name),
                     kind,
                     name,
                     f"Skill ({skill_name})",
@@ -523,8 +523,8 @@ def _project_skill_candidates(
                     path,
                     "project",
                     "skill",
-                    _skill_idea_id(rel, skill_name),
-                    _skill_idea_name(rel, skill_name),
+                    _skill_capability_id(rel, skill_name),
+                    _skill_capability_name(rel, skill_name),
                     kind,
                     name,
                     f"Skill ({skill_name})",
@@ -576,11 +576,11 @@ def _safe_agent_filename(name: str) -> str:
     return hashlib.sha256(name.encode("utf-8")).hexdigest()[:12]
 
 
-def _agent_idea_id(name: str) -> str:
-    return f"{_AGENT_IDEA_PREFIX}{_safe_agent_filename(name)}"
+def _agent_capability_id(name: str) -> str:
+    return f"{_AGENT_CAPABILITY_PREFIX}{_safe_agent_filename(name)}"
 
 
-def _agent_idea_name(name: str) -> str:
+def _agent_capability_name(name: str) -> str:
     return f"Custom agent: {name}"
 
 
@@ -615,11 +615,11 @@ def _command_suffix(provider_kind: str) -> str:
     return ".toml" if provider_kind == "gemini" else ".md"
 
 
-def _command_idea_id(name: str) -> str:
-    return f"{_COMMAND_IDEA_PREFIX}{_safe_agent_filename(name)}"
+def _command_capability_id(name: str) -> str:
+    return f"{_COMMAND_CAPABILITY_PREFIX}{_safe_agent_filename(name)}"
 
 
-def _command_idea_name(name: str) -> str:
+def _command_capability_name(name: str) -> str:
     return f"Command: /{name}"
 
 
@@ -861,8 +861,8 @@ def _agent_candidates(
                     path,
                     scope,
                     "agent",
-                    _agent_idea_id(agent_name),
-                    _agent_idea_name(agent_name),
+                    _agent_capability_id(agent_name),
+                    _agent_capability_name(agent_name),
                     kind,
                     provider_name,
                     f"{provider_name} agent",
@@ -927,8 +927,8 @@ def _command_candidates(
                     path,
                     scope,
                     "command",
-                    _command_idea_id(command_name),
-                    _command_idea_name(command_name),
+                    _command_capability_id(command_name),
+                    _command_capability_name(command_name),
                     kind,
                     provider_name,
                     f"{provider_name} command",
@@ -995,8 +995,8 @@ def _global_config_candidates(provider: dict) -> list[Candidate]:
                 path,
                 "global",
                 "config",
-                _MCP_IDEA_ID,
-                _MCP_IDEA_NAME,
+                _MCP_CAPABILITY_ID,
+                _MCP_CAPABILITY_NAME,
                 kind,
                 name,
                 "Gemini MCP",
@@ -1024,8 +1024,8 @@ def _global_config_candidates(provider: dict) -> list[Candidate]:
                 path,
                 "global",
                 "config",
-                _MCP_IDEA_ID,
-                _MCP_IDEA_NAME,
+                _MCP_CAPABILITY_ID,
+                _MCP_CAPABILITY_NAME,
                 kind,
                 name,
                 "Codex MCP",
@@ -1058,8 +1058,8 @@ def _project_config_candidates(provider: dict, project_root: Path) -> list[Candi
                 project_root / ".mcp.json",
                 "project",
                 "config",
-                _MCP_IDEA_ID,
-                _MCP_IDEA_NAME,
+                _MCP_CAPABILITY_ID,
+                _MCP_CAPABILITY_NAME,
                 kind,
                 name,
                 "Claude MCP",
@@ -1103,8 +1103,8 @@ def _project_config_candidates(provider: dict, project_root: Path) -> list[Candi
                 path,
                 "project",
                 "config",
-                _MCP_IDEA_ID,
-                _MCP_IDEA_NAME,
+                _MCP_CAPABILITY_ID,
+                _MCP_CAPABILITY_NAME,
                 kind,
                 name,
                 "Gemini MCP",
@@ -1119,8 +1119,8 @@ def _project_config_candidates(provider: dict, project_root: Path) -> list[Candi
                 project_root / ".codex" / "config.toml",
                 "project",
                 "config",
-                _MCP_IDEA_ID,
-                _MCP_IDEA_NAME,
+                _MCP_CAPABILITY_ID,
+                _MCP_CAPABILITY_NAME,
                 kind,
                 name,
                 "Codex MCP",
@@ -1307,7 +1307,7 @@ def _entry_id_from_candidate(candidate: Candidate) -> str:
         [
             candidate.scope,
             candidate.category,
-            candidate.idea_id,
+            candidate.capability_id,
             candidate.content_kind,
             str(path),
         ]
@@ -1324,9 +1324,9 @@ def _entry_from_candidate(candidate: Candidate) -> dict:
         "content_kind": candidate.content_kind,
         "scope": candidate.scope,
         "category": candidate.category,
-        "idea_id": candidate.idea_id,
-        "idea_key": _idea_key(candidate.scope, candidate.category, candidate.idea_id),
-        "idea_name": candidate.idea_name,
+        "capability_id": candidate.capability_id,
+        "capability_key": _capability_key(candidate.scope, candidate.category, candidate.capability_id),
+        "capability_name": candidate.capability_name,
         "role": "specific",
         "label": candidate.label,
         "language": candidate.language,
@@ -1380,11 +1380,11 @@ def _entry_from_candidates(candidate: Candidate, by_entry: dict[str, dict]) -> N
     _merge_entry(entry, by_entry)
 
 
-def _idea_key(scope: str, category: str, idea_id: str) -> str:
-    return f"{scope}:{category}:{idea_id}"
+def _capability_key(scope: str, category: str, capability_id: str) -> str:
+    return f"{scope}:{category}:{capability_id}"
 
 
-def _idea_language(category: str, specifics: list[dict]) -> str:
+def _capability_language(category: str, specifics: list[dict]) -> str:
     if category in {"instructions", "memory"}:
         return "markdown"
     if category in {"agent", "skill", "command"}:
@@ -1395,7 +1395,7 @@ def _idea_language(category: str, specifics: list[dict]) -> str:
     return "plaintext"
 
 
-def _idea_extension(language: str) -> str:
+def _capability_extension(language: str) -> str:
     return {
         "markdown": "md",
         "json": "json",
@@ -1403,10 +1403,10 @@ def _idea_extension(language: str) -> str:
     }.get(language, "txt")
 
 
-def _idea_unified_path(
+def _capability_unified_path(
     scope: str,
     category: str,
-    idea_id: str,
+    capability_id: str,
     language: str,
     project_root: Path | None,
 ) -> Path:
@@ -1414,35 +1414,35 @@ def _idea_unified_path(
         root = _sync_home_source() / "provider-config-sync" / "global"
     else:
         if project_root is None:
-            raise HTTPException(status_code=400, detail="project idea requires project root")
+            raise HTTPException(status_code=400, detail="project capability requires project root")
         digest = hashlib.sha256(str(project_root).encode("utf-8")).hexdigest()
         root = _sync_home_source() / "provider-config-sync" / "projects" / digest
-    return root / category / f"{idea_id}.{_idea_extension(language)}"
+    return root / category / f"{capability_id}.{_capability_extension(language)}"
 
 
 def _unified_entry(
     *,
     scope: str,
     category: str,
-    idea_id: str,
-    idea_name: str,
+    capability_id: str,
+    capability_name: str,
     language: str,
     project_root: Path | None,
 ) -> dict:
-    path = _idea_unified_path(scope, category, idea_id, language, project_root).absolute()
+    path = _capability_unified_path(scope, category, capability_id, language, project_root).absolute()
     content, error, exists = _read_entry_content(path)
-    entry_id = ":".join(["unified", scope, category, idea_id, str(path)])
+    entry_id = ":".join(["unified", scope, category, capability_id, str(path)])
     return {
         "entry_id": entry_id,
         "path": str(path),
         "content_kind": _CONTENT_FILE,
         "scope": scope,
         "category": category,
-        "idea_id": idea_id,
-        "idea_key": _idea_key(scope, category, idea_id),
-        "idea_name": idea_name,
+        "capability_id": capability_id,
+        "capability_key": _capability_key(scope, category, capability_id),
+        "capability_name": capability_name,
         "role": "unified",
-        "label": f"{idea_name} unified",
+        "label": f"{capability_name} unified",
         "language": language,
         "content": content,
         "exists": exists,
@@ -1454,28 +1454,28 @@ def _unified_entry(
     }
 
 
-def _idea_from_specifics(
+def _capability_from_specifics(
     *,
     scope: str,
     category: str,
-    idea_id: str,
-    idea_name: str,
+    capability_id: str,
+    capability_name: str,
     specifics: list[dict],
     project_root: Path | None,
 ) -> dict:
-    language = _idea_language(category, specifics)
+    language = _capability_language(category, specifics)
     unified = _unified_entry(
         scope=scope,
         category=category,
-        idea_id=idea_id,
-        idea_name=idea_name,
+        capability_id=capability_id,
+        capability_name=capability_name,
         language=language,
         project_root=project_root,
     )
     return {
-        "id": _idea_key(scope, category, idea_id),
-        "idea_id": idea_id,
-        "name": idea_name,
+        "id": _capability_key(scope, category, capability_id),
+        "capability_id": capability_id,
+        "name": capability_name,
         "scope": scope,
         "category": category,
         "language": language,
@@ -1526,42 +1526,42 @@ def _discover(cwd: str) -> dict:
                     _entry_from_candidates(candidate, by_entry)
 
     specifics = [by_entry[key] for key in sorted(by_entry)]
-    by_idea: dict[str, dict] = {}
+    by_capability: dict[str, dict] = {}
     for entry in specifics:
-        item = by_idea.setdefault(
-            entry["idea_key"],
+        item = by_capability.setdefault(
+            entry["capability_key"],
             {
                 "scope": entry["scope"],
                 "category": entry["category"],
-                "idea_id": entry["idea_id"],
-                "idea_name": entry["idea_name"],
+                "capability_id": entry["capability_id"],
+                "capability_name": entry["capability_name"],
                 "specifics": [],
             },
         )
         item["specifics"].append(entry)
 
-    ideas = [
-        _idea_from_specifics(
+    capabilities = [
+        _capability_from_specifics(
             scope=item["scope"],
             category=item["category"],
-            idea_id=item["idea_id"],
-            idea_name=item["idea_name"],
+            capability_id=item["capability_id"],
+            capability_name=item["capability_name"],
             specifics=item["specifics"],
             project_root=project_root if item["scope"] == "project" else None,
         )
-        for item in sorted(by_idea.values(), key=lambda item: (item["scope"], item["idea_name"]))
+        for item in sorted(by_capability.values(), key=lambda item: (item["scope"], item["capability_name"]))
     ]
-    files = [idea["unified"] for idea in ideas]
-    for idea in ideas:
-        files.extend(idea["specifics"])
+    files = [capability["unified"] for capability in capabilities]
+    for capability in capabilities:
+        files.extend(capability["specifics"])
     return {
         "files": files,
-        "ideas": ideas,
+        "capabilities": capabilities,
         "groups": {
             scope: [
-                idea
-                for idea in ideas
-                if idea["scope"] == scope
+                capability
+                for capability in capabilities
+                if capability["scope"] == scope
             ]
             for scope in ("global", "project")
         },
@@ -1878,8 +1878,8 @@ def _write_entry_if_unchanged(entry: dict, expected: str | None, content: str) -
     _content_adapter(content_kind).write_if_unchanged(path, expected, content, entry["category"])
 
 
-async def _broadcast_changed(scope: str, category: str, idea_id: str, path: str, cwd: str) -> None:
-    result = _broadcast_changed_source(scope, category, idea_id, path, cwd)
+async def _broadcast_changed(scope: str, category: str, capability_id: str, path: str, cwd: str) -> None:
+    result = _broadcast_changed_source(scope, category, capability_id, path, cwd)
     if hasattr(result, "__await__"):
         await result
 
@@ -1911,13 +1911,13 @@ async def write_native_file(req: WriteNativeFileRequest):
         if _expected_content(current, exists) != req.expected_content:
             raise HTTPException(status_code=409, detail="file changed; refresh before saving")
         _write_entry_if_unchanged(entry, req.expected_content, req.content)
-    await _broadcast_changed(entry["scope"], entry["category"], entry["idea_id"], entry["path"], req.cwd)
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
     return {"ok": True, "path": entry["path"]}
 
 
 class ApplyNativeFileRequest(BaseModel):
     cwd: str = ""
-    idea_id: str
+    capability_id: str
     source_entry_id: str | None = None
     target_entry_id: str | None = None
     source_path: str | None = None
@@ -1926,42 +1926,42 @@ class ApplyNativeFileRequest(BaseModel):
     expected_target: str | None = None
 
 
-class UpsertUnifiedItemRequest(BaseModel):
+class UpsertUnifiedCapabilityItemRequest(BaseModel):
     cwd: str = ""
     scope: str | None = None
-    idea_id: str
+    capability_id: str
     item_name: str | None = None
     item: dict[str, Any]
     expected_content: str | None = None
 
 
-class RemoveUnifiedItemRequest(BaseModel):
+class RemoveUnifiedCapabilityItemRequest(BaseModel):
     cwd: str = ""
     scope: str | None = None
-    idea_id: str
+    capability_id: str
     item_name: str
     expected_content: str | None = None
 
 
-def _idea_for_tool(cwd: str, idea_id: str, scope: str | None = None) -> dict:
+def _capability_for_tool(cwd: str, capability_id: str, scope: str | None = None) -> dict:
     preferred_scope = scope or ("project" if cwd else "global")
-    matches = [idea for idea in _discover(cwd)["ideas"] if idea["idea_id"] == idea_id]
-    for idea in matches:
-        if idea["scope"] == preferred_scope:
-            return idea
-    for idea in matches:
+    matches = [capability for capability in _discover(cwd)["capabilities"] if capability["capability_id"] == capability_id]
+    for capability in matches:
+        if capability["scope"] == preferred_scope:
+            return capability
+    for capability in matches:
         if scope is None:
-            return idea
-    raise HTTPException(status_code=400, detail=f"unknown provider config sync idea: {idea_id}")
+            return capability
+    raise HTTPException(status_code=400, detail=f"unknown provider config sync capability: {capability_id}")
 
 
-def _current_unified_for_tool(cwd: str, idea_id: str, scope: str | None = None) -> tuple[dict, str, bool]:
-    idea = _idea_for_tool(cwd, idea_id, scope)
-    entry = idea["unified"]
+def _current_unified_for_tool(cwd: str, capability_id: str, scope: str | None = None) -> tuple[dict, str, bool]:
+    capability = _capability_for_tool(cwd, capability_id, scope)
+    entry = capability["unified"]
     if not entry.get("writable"):
         raise HTTPException(status_code=400, detail="unified entry is not writable")
     current, exists = _read_entry_current(entry)
-    return idea, current, exists
+    return capability, current, exists
 
 
 def _check_tool_expected(current: str, exists: bool, expected: str | None) -> None:
@@ -1971,11 +1971,11 @@ def _check_tool_expected(current: str, exists: bool, expected: str | None) -> No
         raise HTTPException(status_code=409, detail="unified file changed; refresh before editing")
 
 
-def _normalized_common_item_from_tool(idea: dict, item: dict[str, Any], item_name: str | None) -> str:
+def _normalized_common_item_from_tool(capability: dict, item: dict[str, Any], item_name: str | None) -> str:
     metadata = item.get("metadata") or {}
     if not isinstance(metadata, dict):
         raise HTTPException(status_code=400, detail="metadata must be an object")
-    if idea["category"] == "command":
+    if capability["category"] == "command":
         payload = _normalized_command_payload(
             path=Path("<command>"),
             name=item.get("name") or item_name,
@@ -1985,8 +1985,8 @@ def _normalized_common_item_from_tool(idea: dict, item: dict[str, Any], item_nam
         )
         return _normalized_item_text(payload)
     payload = _normalized_item_payload(
-        item_label=idea["category"],
-        path=Path(f"<{idea['category']}>"),
+        item_label=capability["category"],
+        path=Path(f"<{capability['category']}>"),
         name=item.get("name") or item_name,
         description=item.get("description"),
         instructions=item.get("instructions"),
@@ -2001,11 +2001,11 @@ def _mcp_tool_content(current: str, exists: bool) -> dict[str, Any]:
     return {"mcpServers": _mcp_servers_from_fragment(current)}
 
 
-async def upsert_unified_item(req: UpsertUnifiedItemRequest):
-    idea, current, exists = _current_unified_for_tool(req.cwd, req.idea_id, req.scope)
+async def upsert_unified_capability_item(req: UpsertUnifiedCapabilityItemRequest):
+    capability, current, exists = _current_unified_for_tool(req.cwd, req.capability_id, req.scope)
     _check_tool_expected(current, exists, req.expected_content)
-    entry = idea["unified"]
-    if idea["idea_id"] == _MCP_IDEA_ID:
+    entry = capability["unified"]
+    if capability["capability_id"] == _MCP_CAPABILITY_ID:
         name = (req.item_name or req.item.get("name") or "").strip()
         if not name:
             raise HTTPException(status_code=400, detail="item_name is required for MCP server edits")
@@ -2017,35 +2017,35 @@ async def upsert_unified_item(req: UpsertUnifiedItemRequest):
         content = _mcp_tool_content(current, exists)
         content["mcpServers"][name] = item
         next_content = json.dumps(content, indent=2, sort_keys=True) + "\n"
-    elif idea["category"] in {"agent", "skill", "command"}:
-        next_content = _normalized_common_item_from_tool(idea, req.item, req.item_name)
+    elif capability["category"] in {"agent", "skill", "command"}:
+        next_content = _normalized_common_item_from_tool(capability, req.item, req.item_name)
     else:
-        raise HTTPException(status_code=400, detail=f"idea does not support item edits: {idea['category']}")
+        raise HTTPException(status_code=400, detail=f"capability does not support item edits: {capability['category']}")
     with _lock:
         latest, latest_exists = _read_entry_current(entry)
         _check_tool_expected(latest, latest_exists, req.expected_content)
         if req.expected_content is None:
             current, exists = latest, latest_exists
-            if idea["idea_id"] == _MCP_IDEA_ID:
+            if capability["capability_id"] == _MCP_CAPABILITY_ID:
                 content = _mcp_tool_content(current, exists)
                 name = (req.item_name or req.item.get("name") or "").strip()
                 item = {key: value for key, value in req.item.items() if key != "name"}
                 content["mcpServers"][name] = item
                 next_content = json.dumps(content, indent=2, sort_keys=True) + "\n"
         _write_entry_if_unchanged(entry, _expected_content(latest, latest_exists), next_content)
-    await _broadcast_changed(entry["scope"], entry["category"], entry["idea_id"], entry["path"], req.cwd)
-    return {"ok": True, "path": entry["path"], "idea_id": idea["idea_id"], "content": next_content}
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    return {"ok": True, "path": entry["path"], "capability_id": capability["capability_id"], "content": next_content}
 
 
-async def remove_unified_item(req: RemoveUnifiedItemRequest):
-    idea, current, exists = _current_unified_for_tool(req.cwd, req.idea_id, req.scope)
+async def remove_unified_capability_item(req: RemoveUnifiedCapabilityItemRequest):
+    capability, current, exists = _current_unified_for_tool(req.cwd, req.capability_id, req.scope)
     _check_tool_expected(current, exists, req.expected_content)
-    if idea["idea_id"] != _MCP_IDEA_ID:
+    if capability["capability_id"] != _MCP_CAPABILITY_ID:
         raise HTTPException(status_code=400, detail="remove item currently supports MCP server items only")
     name = req.item_name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="item_name is required")
-    entry = idea["unified"]
+    entry = capability["unified"]
     with _lock:
         latest, latest_exists = _read_entry_current(entry)
         _check_tool_expected(latest, latest_exists, req.expected_content)
@@ -2053,8 +2053,8 @@ async def remove_unified_item(req: RemoveUnifiedItemRequest):
         content["mcpServers"].pop(name, None)
         next_content = json.dumps(content, indent=2, sort_keys=True) + "\n"
         _write_entry_if_unchanged(entry, _expected_content(latest, latest_exists), next_content)
-    await _broadcast_changed(entry["scope"], entry["category"], entry["idea_id"], entry["path"], req.cwd)
-    return {"ok": True, "path": entry["path"], "idea_id": idea["idea_id"], "content": next_content}
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    return {"ok": True, "path": entry["path"], "capability_id": capability["capability_id"], "content": next_content}
 
 
 @router.post("/apply")
@@ -2070,8 +2070,8 @@ async def apply_native_file(req: ApplyNativeFileRequest):
         raise HTTPException(status_code=400, detail="source is not a readable sync entry")
     if target is None or not target.get("writable"):
         raise HTTPException(status_code=400, detail="target is not an editable sync entry")
-    if source["idea_key"] != target["idea_key"] or source["idea_id"] != req.idea_id:
-        raise HTTPException(status_code=400, detail="source and target must share the same sync idea")
+    if source["capability_key"] != target["capability_key"] or source["capability_id"] != req.capability_id:
+        raise HTTPException(status_code=400, detail="source and target must share the same sync capability")
     if source["role"] == target["role"]:
         raise HTTPException(status_code=400, detail="sync apply must be between unified and provider-specific entries")
     if not source.get("exists"):
@@ -2087,15 +2087,15 @@ async def apply_native_file(req: ApplyNativeFileRequest):
         ):
             raise HTTPException(status_code=409, detail="file changed; refresh before applying")
         _write_entry_if_unchanged(target, req.expected_target, source_text)
-    await _broadcast_changed(target["scope"], target["category"], target["idea_id"], target["path"], req.cwd)
+    await _broadcast_changed(target["scope"], target["category"], target["capability_id"], target["path"], req.cwd)
     return {"ok": True, "source_path": source["path"], "target_path": target["path"]}
 
 
-@router.post("/unified-item")
-async def upsert_unified_item_route(req: UpsertUnifiedItemRequest):
-    return await upsert_unified_item(req)
+@router.post("/unified-capability-item")
+async def upsert_unified_capability_item_route(req: UpsertUnifiedCapabilityItemRequest):
+    return await upsert_unified_capability_item(req)
 
 
-@router.delete("/unified-item")
-async def remove_unified_item_route(req: RemoveUnifiedItemRequest):
-    return await remove_unified_item(req)
+@router.delete("/unified-capability-item")
+async def remove_unified_capability_item_route(req: RemoveUnifiedCapabilityItemRequest):
+    return await remove_unified_capability_item(req)

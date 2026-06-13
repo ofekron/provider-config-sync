@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -21,6 +22,8 @@ if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
 from provider_config_sync_backend import api  # noqa: E402
+from provider_config_sync_backend.agent_integrations import install_agent_integrations  # noqa: E402
+from provider_config_sync_backend.mcp_server import create_server  # noqa: E402
 from provider_config_sync_backend.standalone import create_app  # noqa: E402
 
 FAILURES: list[str] = []
@@ -59,7 +62,7 @@ def t_standalone_project_mcp_roundtrip() -> None:
         )
 
         payload = api._discover(str(project))
-        mcp = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "mcp")
+        mcp = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "mcp")
         by_kind = {entry["provider_kinds"][0]: entry for entry in mcp["specifics"]}
         check(set(by_kind) == {"claude", "gemini"}, "standalone discovery finds configured providers")
         check(str(sync_home) in mcp["unified"]["path"], "unified tracking lives under injected sync home")
@@ -68,7 +71,7 @@ def t_standalone_project_mcp_roundtrip() -> None:
             api.apply_native_file(
                 api.ApplyNativeFileRequest(
                     cwd=str(project),
-                    idea_id="mcp",
+                    capability_id="mcp",
                     source_entry_id=by_kind["claude"]["entry_id"],
                     target_entry_id=mcp["unified"]["entry_id"],
                     expected_source=by_kind["claude"]["content"],
@@ -77,13 +80,13 @@ def t_standalone_project_mcp_roundtrip() -> None:
             )
         )
         payload = api._discover(str(project))
-        mcp = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "mcp")
+        mcp = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "mcp")
         by_kind = {entry["provider_kinds"][0]: entry for entry in mcp["specifics"]}
         asyncio.run(
             api.apply_native_file(
                 api.ApplyNativeFileRequest(
                     cwd=str(project),
-                    idea_id="mcp",
+                    capability_id="mcp",
                     source_entry_id=mcp["unified"]["entry_id"],
                     target_entry_id=by_kind["gemini"]["entry_id"],
                     expected_source=mcp["unified"]["content"],
@@ -124,6 +127,41 @@ def t_standalone_app_loads_json_config() -> None:
         shutil.rmtree(wipe)
 
 
+def t_mcp_server_exposes_sync_tools() -> None:
+    server = create_server()
+    tools = asyncio.run(server.list_tools())
+    names = {tool.name for tool in tools}
+    check(
+        {
+            "list_provider_config_capabilities",
+            "read_provider_config_entry",
+            "write_provider_config_entry",
+            "apply_provider_config_entry",
+            "upsert_unified_capability_item",
+            "remove_unified_capability_item",
+        }.issubset(names),
+        "MCP server exposes provider config sync tools",
+    )
+
+
+def t_agent_integrations_install_native_commands() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-agent-integrations-"))
+    old_home = os.environ.get("HOME")
+    try:
+        os.environ["HOME"] = str(wipe)
+        results = install_agent_integrations()
+        check(all(line.startswith("wrote:") for line in results), "agent integration installer writes native commands")
+        check((wipe / ".claude" / "commands" / "provider-config-sync.md").is_file(), "Claude command is installed")
+        check((wipe / ".codex" / "prompts" / "provider-config-sync.md").is_file(), "Codex prompt is installed")
+        check((wipe / ".gemini" / "commands" / "provider-config-sync.toml").is_file(), "Gemini command is installed")
+    finally:
+        if old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old_home
+        shutil.rmtree(wipe)
+
+
 def t_standalone_commands_convert_provider_formats() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-commands-"))
     try:
@@ -151,7 +189,7 @@ def t_standalone_commands_convert_provider_formats() -> None:
         )
 
         payload = api._discover(str(project))
-        command = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "command-review")
+        command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
         check(set(by_kind) == {"claude", "gemini"}, "project commands offer Claude and Gemini targets")
         check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Grep", "Claude command metadata is normalized")
@@ -160,7 +198,7 @@ def t_standalone_commands_convert_provider_formats() -> None:
             api.apply_native_file(
                 api.ApplyNativeFileRequest(
                     cwd=str(project),
-                    idea_id="command-review",
+                    capability_id="command-review",
                     source_entry_id=by_kind["claude"]["entry_id"],
                     target_entry_id=command["unified"]["entry_id"],
                     expected_source=by_kind["claude"]["content"],
@@ -169,13 +207,13 @@ def t_standalone_commands_convert_provider_formats() -> None:
             )
         )
         payload = api._discover(str(project))
-        command = next(idea for idea in payload["groups"]["project"] if idea["idea_id"] == "command-review")
+        command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
         asyncio.run(
             api.apply_native_file(
                 api.ApplyNativeFileRequest(
                     cwd=str(project),
-                    idea_id="command-review",
+                    capability_id="command-review",
                     source_entry_id=command["unified"]["entry_id"],
                     target_entry_id=by_kind["gemini"]["entry_id"],
                     expected_source=command["unified"]["content"],
@@ -189,12 +227,12 @@ def t_standalone_commands_convert_provider_formats() -> None:
         check(gemini_data["prompt"] == "Review the changed files.\n", "Gemini command gets prompt")
 
         payload = api._discover("")
-        check("command-review" not in {idea["idea_id"] for idea in payload["groups"]["global"]}, "global command absent before Codex prompt exists")
+        check("command-review" not in {capability["capability_id"] for capability in payload["groups"]["global"]}, "global command absent before Codex prompt exists")
         codex_prompt = wipe / "codex" / "prompts" / "review.md"
         codex_prompt.parent.mkdir(parents=True)
         codex_prompt.write_text("Review the worktree.\n", encoding="utf-8")
         payload = api._discover("")
-        global_command = next(idea for idea in payload["groups"]["global"] if idea["idea_id"] == "command-review")
+        global_command = next(capability for capability in payload["groups"]["global"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in global_command["specifics"]}
         check("codex" in by_kind, "Codex custom prompt appears as global command")
     finally:
@@ -204,6 +242,8 @@ def t_standalone_commands_convert_provider_formats() -> None:
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
+    t_mcp_server_exposes_sync_tools()
+    t_agent_integrations_install_native_commands()
     t_standalone_commands_convert_provider_formats()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")

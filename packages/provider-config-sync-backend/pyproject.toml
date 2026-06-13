@@ -15,9 +15,14 @@ dependencies = [
 
 [project.optional-dependencies]
 server = ["uvicorn"]
+mcp = ["mcp"]
+all = ["uvicorn", "mcp"]
 
 [project.scripts]
 provider-config-sync-backend = "provider_config_sync_backend.standalone:main"
+provider-config-sync-api = "provider_config_sync_backend.standalone:main"
+provider-config-sync-mcp = "provider_config_sync_backend.mcp_server:main"
+provider-config-sync-install-agent-integrations = "provider_config_sync_backend.agent_integrations:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/provider_config_sync_backend"]
