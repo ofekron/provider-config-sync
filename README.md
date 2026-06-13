@@ -150,6 +150,14 @@ Environment:
 
 Then ask Goose to inspect or sync agent config capabilities for the current project. The MCP server exposes tools to list capabilities, read files, edit files with conflict checks, apply unified-to-specific changes, pull provider-specific changes into unified tracking, and manage structured items such as MCP servers, skills, commands, and agents.
 
+To open the inline Goose UI, ask Goose to run:
+
+```text
+open_provider_config_sync_gui
+```
+
+The Goose app renders from the same stdio MCP server with a `ui://provider-config-sync/main` MCP App resource. It lets users load a project, inspect token totals, edit provider or unified files, and apply a selected file to the matching unified/provider side without leaving Goose.
+
 For a local checkout, use:
 
 ```text

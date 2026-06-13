@@ -140,6 +140,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
     names = {tool.name for tool in tools}
     check(
         {
+            "open_provider_config_sync_gui",
             "list_provider_config_capabilities",
             "read_provider_config_entry",
             "write_provider_config_entry",
@@ -149,6 +150,18 @@ def t_mcp_server_exposes_sync_tools() -> None:
         }.issubset(names),
         "MCP server exposes provider config sync tools",
     )
+    gui_tool = next(tool for tool in tools if tool.name == "open_provider_config_sync_gui")
+    check(
+        gui_tool.meta["ui"]["resourceUri"] == "ui://provider-config-sync/main",
+        "Goose GUI tool declares MCP App resource metadata",
+    )
+    resources = asyncio.run(server.list_resources())
+    resource = next(item for item in resources if str(item.uri) == "ui://provider-config-sync/main")
+    check(resource.mimeType == "text/html;profile=mcp-app", "Goose GUI resource uses MCP App HTML mime type")
+    content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
+    check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
+    result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))
+    check(result.structuredContent["cwd"] == "/repo", "Goose GUI tool returns requested project path")
 
 
 def t_agent_integrations_install_native_commands() -> None:

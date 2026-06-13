@@ -4,8 +4,10 @@ from typing import Any
 
 from fastapi import HTTPException
 from mcp.server.fastmcp import FastMCP
+from mcp.types import CallToolResult, TextContent
 
 from . import api
+from .goose_app import GOOSE_APP_MIME_TYPE, GOOSE_APP_URI, goose_app_html
 from .standalone import configure_from_file
 
 
@@ -23,6 +25,50 @@ def create_server() -> FastMCP:
         ),
         website_url="https://github.com/ofekron/provider-config-sync",
     )
+
+    @server.resource(
+        GOOSE_APP_URI,
+        name="Provider Config Sync",
+        title="Provider Config Sync",
+        description="Interactive Goose MCP App for syncing provider-native agent config capabilities.",
+        mime_type=GOOSE_APP_MIME_TYPE,
+        meta={
+            "ui": {
+                "csp": {
+                    "connectDomains": [],
+                    "resourceDomains": [],
+                    "frameDomains": [],
+                    "baseUriDomains": [],
+                },
+                "prefersBorder": True,
+            }
+        },
+    )
+    def provider_config_sync_goose_app() -> str:
+        return goose_app_html()
+
+    @server.tool(
+        meta={
+            "ui": {
+                "resourceUri": GOOSE_APP_URI,
+                "visibility": ["model", "app"],
+            }
+        }
+    )
+    def open_provider_config_sync_gui(cwd: str = "") -> CallToolResult:
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=(
+                        "Provider Config Sync GUI opened. "
+                        f"Project path: {cwd or 'configured default/current project'}"
+                    ),
+                )
+            ],
+            structuredContent={"cwd": cwd},
+            meta={"ui": {"resourceUri": GOOSE_APP_URI}},
+        )
 
     @server.tool()
     def list_provider_config_capabilities(cwd: str = "") -> dict[str, Any]:
