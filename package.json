@@ -1,0 +1,12 @@
+{
+  "name": "provider-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/provider-sync-core"
+  ],
+  "scripts": {
+    "build:core": "npm --prefix packages/provider-sync-core run build"
+  }
+}

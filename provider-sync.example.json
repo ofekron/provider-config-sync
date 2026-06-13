@@ -1,0 +1,11 @@
+{
+  "sync_home": "~/.provider-sync",
+  "providers": [
+    { "id": "claude", "name": "Claude", "kind": "claude", "config_dir": "~/.claude" },
+    { "id": "codex", "name": "Codex", "kind": "codex", "config_dir": "~/.codex" },
+    { "id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": "~/.gemini" }
+  ],
+  "projects": [
+    { "path": "/absolute/path/to/your/project", "node_id": "primary" }
+  ]
+}
