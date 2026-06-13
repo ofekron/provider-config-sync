@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.svg" alt="Provider Config Sync icon" width="112" height="112">
+</p>
+
 # Provider Config Sync
 
 **One control plane for AI-agent configuration across Claude, Codex, and Gemini.**
