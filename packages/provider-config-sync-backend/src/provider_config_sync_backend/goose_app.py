@@ -321,6 +321,7 @@ def goose_app_html() -> str:
 
     function renderTargets() {
       const source = state.entry;
+      const dirty = source && $("content").value !== state.original;
       $("sourceLabel").textContent = source ? entryTitle(source) : "";
       $("targets").innerHTML = "";
       if (!source || !state.capability) return;
@@ -331,8 +332,8 @@ def goose_app_html() -> str:
         button.innerHTML = "<strong></strong><span class='meta'></span><span class='meta'></span>";
         button.children[0].textContent = "Apply to " + entryTitle(target);
         button.children[1].textContent = target.path;
-        button.children[2].textContent = target.exists ? tokens(target.token_count) + " tokens" : "new file";
-        button.disabled = !target.writable || !source.exists;
+        button.children[2].textContent = dirty ? "Save source before applying" : target.exists ? tokens(target.token_count) + " tokens" : "new file";
+        button.disabled = dirty || !target.writable || !source.exists;
         button.onclick = () => applyTo(target);
         $("targets").appendChild(button);
       }
@@ -427,7 +428,8 @@ def goose_app_html() -> str:
     $("load").onclick = load;
     $("reload").onclick = load;
     $("save").onclick = save;
-    $("reset").onclick = () => { $("content").value = state.original; };
+    $("reset").onclick = () => { $("content").value = state.original; renderTargets(); };
+    $("content").oninput = renderTargets;
     $("entrySelect").onchange = event => selectEntry(event.target.value);
     app.init().then(load);
   </script>

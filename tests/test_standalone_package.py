@@ -161,6 +161,8 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check(resource.mimeType == "text/html;profile=mcp-app", "Goose GUI resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
     check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
+    check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
+    check('"reset").onclick = () => { $("content").value = state.original; renderTargets(); }' in content.content, "Goose GUI reset restores apply buttons")
     result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))
     check(result.structuredContent["cwd"] == "/repo", "Goose GUI tool returns requested project path")
 
@@ -216,7 +218,12 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
             if provider == "claude":
                 check("--print" in command and "--mcp-config" in command, "Claude automation is non-interactive with MCP config")
             if provider == "codex":
-                check(command[:2] == ["codex", "exec"] and "--ask-for-approval" in command, "Codex automation uses exec mode")
+                check(command[:4] == ["codex", "--ask-for-approval", "never", "exec"], "Codex automation puts approval at root")
+                check("--cd" in command and "--sandbox" in command, "Codex automation uses exec workspace mode")
+                check(
+                    any("default_tools_approval_mode" in item and '"approve"' in item for item in command),
+                    "Codex automation approves provider sync MCP tools",
+                )
             if provider == "gemini":
                 check(command[:2] == ["gemini", "--prompt"], "Gemini automation uses prompt mode")
                 check("GEMINI_CLI_SYSTEM_SETTINGS_PATH" in env, "Gemini automation uses temporary system settings")

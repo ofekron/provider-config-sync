@@ -123,17 +123,21 @@ def _codex_command(prompt: str, cwd: Path, config_path: Path | None, _temp_dir: 
     env = _mcp_env(config_path)
     cmd = [
         "codex",
+        "--ask-for-approval",
+        "never",
         "exec",
         "--cd",
         str(cwd),
-        "--ask-for-approval",
-        "never",
         "--sandbox",
         "workspace-write",
         "-c",
         _codex_config_arg(f"mcp_servers.{_SERVER_NAME}.command", command),
         "-c",
         _codex_config_arg(f"mcp_servers.{_SERVER_NAME}.args", args),
+        "-c",
+        _codex_config_arg(f"mcp_servers.{_SERVER_NAME}.enabled_tools", _SYNC_TOOLS),
+        "-c",
+        _codex_config_arg(f"mcp_servers.{_SERVER_NAME}.default_tools_approval_mode", "approve"),
     ]
     for key, value in sorted(env.items()):
         cmd.extend(["-c", _codex_config_arg(f"mcp_servers.{_SERVER_NAME}.env.{key}", value)])
