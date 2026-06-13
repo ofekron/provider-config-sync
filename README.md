@@ -8,7 +8,9 @@ It is built for the messy reality of multi-provider agent workflows: every CLI h
 
 ## Why It Exists
 
-AI coding agents are becoming operating environments. Teams now carry important behavior in files like:
+AI coding agents are becoming operating environments, and their config files are no longer minor setup details. They shape token usage, tool access, context quality, answer correctness, agent effectiveness, and how much wall-clock time gets spent on every task. A small stale instruction, missing MCP server, or mismatched project memory can quietly make an agent slower, more expensive, less reliable, or just wrong.
+
+That makes these files worth editing deliberately, even manually. Teams now carry important behavior in files like:
 
 - `CLAUDE.md`
 - `AGENTS.md`
