@@ -23,6 +23,7 @@ if str(_PACKAGE_SRC) not in sys.path:
 
 from provider_config_sync_backend import api  # noqa: E402
 from provider_config_sync_backend.agent_integrations import install_agent_integrations  # noqa: E402
+from provider_config_sync_backend.automation import _automation_prompt, _build_command, _projects  # noqa: E402
 from provider_config_sync_backend.mcp_server import create_server  # noqa: E402
 from provider_config_sync_backend.standalone import create_app  # noqa: E402
 
@@ -182,6 +183,47 @@ def t_agent_integrations_install_native_commands() -> None:
         shutil.rmtree(wipe)
 
 
+def t_automation_builds_noninteractive_agent_commands() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-automation-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        config_path = wipe / "provider-config-sync.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "sync_home": str(wipe / "sync-home"),
+                    "providers": [
+                        {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")},
+                        {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": str(wipe / "codex")},
+                        {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": str(wipe / "gemini")},
+                    ],
+                    "projects": [{"path": str(project), "node_id": "primary"}],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        prompt = _automation_prompt(_projects(config_path), "Prefer shortest shared config.")
+        check(str(project) in prompt and 'cwd=""' in prompt, "automation prompt covers project and global scopes")
+        for provider in ("claude", "codex", "gemini"):
+            temp = wipe / provider
+            temp.mkdir()
+            command, env = _build_command(provider, prompt, project, config_path, temp)
+            joined = " ".join(command)
+            check("provider_config_sync" in joined or "provider-config-sync" in joined, f"{provider} command injects sync MCP server")
+            check(prompt in command, f"{provider} command passes the reconciliation prompt")
+            if provider == "claude":
+                check("--print" in command and "--mcp-config" in command, "Claude automation is non-interactive with MCP config")
+            if provider == "codex":
+                check(command[:2] == ["codex", "exec"] and "--ask-for-approval" in command, "Codex automation uses exec mode")
+            if provider == "gemini":
+                check(command[:2] == ["gemini", "--prompt"], "Gemini automation uses prompt mode")
+                check("GEMINI_CLI_SYSTEM_SETTINGS_PATH" in env, "Gemini automation uses temporary system settings")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_standalone_commands_convert_provider_formats() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-commands-"))
     try:
@@ -264,6 +306,7 @@ def main() -> int:
     t_standalone_app_loads_json_config()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
+    t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")

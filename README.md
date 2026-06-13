@@ -182,6 +182,15 @@ That installs:
 
 Those commands tell Claude Code, Codex, and Gemini to use the unified capability form first, then apply the capability to the other configured providers.
 
+Run automatic reconciliation through your preferred CLI:
+
+```bash
+PROVIDER_CONFIG_SYNC_CONFIG=./provider-config-sync.json \
+  provider-config-sync-automate --cli claude --prompt "Reconcile everything conservatively."
+```
+
+Supported `--cli` values are `claude`, `codex`, and `gemini`. The command runs the selected agent in non-interactive mode with the Provider Config Sync MCP server attached for that run, then asks it to reconcile global config plus every project listed in `provider-config-sync.json`.
+
 ## API Surface
 
 The standalone app mounts:
