@@ -316,6 +316,72 @@ def t_standalone_commands_convert_provider_formats() -> None:
         shutil.rmtree(wipe)
 
 
+def t_auto_sync_applies_auto_and_reviews_per_hunk() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-auto-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        claude = project / "CLAUDE.md"
+        claude.write_text("alpha\nBRAVO\ncharlie\ndelta\n", encoding="utf-8")
+        api.configure(
+            provider_records=lambda: [{"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")}],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+        payload = api._discover(str(project))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified = instructions["unified"]
+        by_kind = {entry["provider_kinds"][0]: entry for entry in instructions["specifics"]}
+        unified_path = Path(unified["path"])
+        unified_path.parent.mkdir(parents=True, exist_ok=True)
+        unified_path.write_text("alpha\nbravo\ncharlie\n", encoding="utf-8")
+
+        payload = api._discover(str(project))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified = instructions["unified"]
+        by_kind = {entry["provider_kinds"][0]: entry for entry in instructions["specifics"]}
+        result = asyncio.run(
+            api.auto_sync(
+                api.AutoSyncRequest(
+                    cwd=str(project),
+                    capability_id="instructions",
+                    source_entry_id=unified["entry_id"],
+                    target_entry_id=by_kind["claude"]["entry_id"],
+                    expected_source=unified["content"],
+                    expected_target=by_kind["claude"]["content"],
+                    policy=api.AutoSyncPolicy(additive="off", removal="review", change="auto"),
+                )
+            )
+        )
+        check(result["applied_count"] == 1, "auto sync applies edit hunks")
+        check(result["pending_count"] == 1, "auto sync returns removal hunks for approval")
+        check(claude.read_text(encoding="utf-8") == "alpha\nbravo\ncharlie\ndelta\n", "auto sync leaves reviewed removal hunk untouched")
+
+        payload = api._discover(str(project))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified = instructions["unified"]
+        by_kind = {entry["provider_kinds"][0]: entry for entry in instructions["specifics"]}
+        pending = next(item for item in result["log_head"] if item["status"] == "pending")
+        asyncio.run(
+            api.auto_sync(
+                api.AutoSyncRequest(
+                    cwd=str(project),
+                    capability_id="instructions",
+                    source_entry_id=unified["entry_id"],
+                    target_entry_id=by_kind["claude"]["entry_id"],
+                    expected_source=unified["content"],
+                    expected_target=by_kind["claude"]["content"],
+                    policy=api.AutoSyncPolicy(additive="off", removal="review", change="auto"),
+                    approved_hunk_ids=[pending["hunk_id"]],
+                )
+            )
+        )
+        check(claude.read_text(encoding="utf-8") == "alpha\nbravo\ncharlie\n", "approved hunk applies per hunk")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
@@ -323,6 +389,7 @@ def main() -> int:
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
+    t_auto_sync_applies_auto_and_reviews_per_hunk()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")
         for failure in FAILURES:
