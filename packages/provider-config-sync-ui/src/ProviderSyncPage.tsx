@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   applyRowsToContent,
   buildAlignedDiffRows,
@@ -1347,17 +1347,33 @@ function EditableDiffCell({
   writable: boolean;
   onChange: (lineNumber: number | null, fallbackIndex: number, content: string) => void;
 }) {
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   const rows = Math.max(1, text.split(/\r?\n/).length);
+  const resizeEditor = useCallback((editor: HTMLTextAreaElement) => {
+    editor.style.height = "auto";
+    editor.style.height = `${editor.scrollHeight}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    resizeEditor(editor);
+  }, [resizeEditor, text]);
+
   return (
     <div className={cellClassName}>
       <textarea
+        ref={editorRef}
         aria-label={`${label} line ${lineNumber ?? fallbackIndex + 1}`}
         className="provider-sync-aligned-diff-cell-editor"
         defaultValue={text}
         readOnly={!writable}
         rows={rows}
         spellCheck={false}
-        onChange={(e) => onChange(lineNumber, fallbackIndex, e.target.value)}
+        onChange={(e) => {
+          resizeEditor(e.target);
+          onChange(lineNumber, fallbackIndex, e.target.value);
+        }}
       />
     </div>
   );

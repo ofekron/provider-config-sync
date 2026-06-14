@@ -137,11 +137,15 @@ def t_standalone_app_loads_json_config() -> None:
 
 
 def t_diff_line_editors_hide_textarea_chrome() -> None:
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
     styles = _UI_STYLES.read_text(encoding="utf-8")
     editor_rule = styles.split(".provider-sync-aligned-diff-cell-editor {", 1)[1].split("}", 1)[0]
     check("resize: none;" in editor_rule, "diff line editors disable manual resize")
     check("overflow: hidden;" in editor_rule, "diff line editors hide textarea scroll chrome")
     check("scrollbar-width: none;" in editor_rule, "diff line editors hide firefox scrollbars")
+    check("box-sizing: border-box;" in editor_rule, "diff line editor measured height includes padding")
+    check("useLayoutEffect" in page, "diff line editors resize after layout")
+    check("scrollHeight" in page, "diff line editors grow to wrapped content height")
     check(
         ".provider-sync-aligned-diff-cell-editor::-webkit-resizer" in styles,
         "diff line editors hide webkit resize handles",

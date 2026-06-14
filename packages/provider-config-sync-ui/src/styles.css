@@ -854,6 +854,7 @@
   min-width: 0;
   width: 100%;
   min-height: 32px;
+  box-sizing: border-box;
   resize: none;
   border: 0;
   border-radius: 0;
