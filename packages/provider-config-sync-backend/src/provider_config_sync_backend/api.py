@@ -2316,18 +2316,22 @@ class CreateCapabilityRequest(BaseModel):
     cwd: str = ""
     scope: str
     category: str
-    provider_kind: str
+    provider_kinds: list[str]
     name: str
     description: str = ""
     instructions: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-def _provider_by_kind(provider_kind: str) -> dict:
-    for provider in _provider_records():
-        if provider["kind"] == provider_kind:
-            return provider
-    raise HTTPException(status_code=400, detail="unknown provider kind")
+def _providers_by_kinds(provider_kinds: list[str]) -> list[dict]:
+    requested = [kind for kind in dict.fromkeys(provider_kinds) if kind]
+    if not requested:
+        raise HTTPException(status_code=400, detail="at least one provider is required")
+    providers = {provider["kind"]: provider for provider in _provider_records()}
+    missing = [kind for kind in requested if kind not in providers]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"unknown provider kind: {', '.join(missing)}")
+    return [providers[kind] for kind in requested]
 
 
 def _project_root_for_scope(scope: str, cwd: str) -> Path | None:
@@ -2368,6 +2372,13 @@ def _new_capability_content(req: CreateCapabilityRequest) -> str:
         "metadata": req.metadata or {},
     }
     return _normalized_common_item_from_tool({"category": req.category}, item, req.name)
+
+
+def _merged_entries_from_candidates(candidates: list[Candidate]) -> list[dict]:
+    by_entry: dict[str, dict] = {}
+    for candidate in candidates:
+        _merge_entry(_entry_from_candidate(candidate), by_entry)
+    return list(by_entry.values())
 
 
 @router.put("/file")
@@ -2482,23 +2493,45 @@ async def delete_capability_route(req: DeleteCapabilityRequest):
 
 
 async def create_capability(req: CreateCapabilityRequest):
-    provider = _provider_by_kind(req.provider_kind)
+    providers = _providers_by_kinds(req.provider_kinds)
     project_root = _project_root_for_scope(req.scope, req.cwd)
-    candidate = _new_capability_candidate(req, provider, project_root)
-    entry = _entry_from_candidate(candidate)
-    if entry["exists"]:
-        raise HTTPException(status_code=409, detail="capability already exists for that provider")
-    if not entry["writable"]:
-        raise HTTPException(status_code=400, detail="capability is not writable")
+    candidates = [_new_capability_candidate(req, provider, project_root) for provider in providers]
+    entries = _merged_entries_from_candidates(candidates)
+    for entry in entries:
+        if entry["exists"]:
+            raise HTTPException(status_code=409, detail=f"capability already exists for {entry['provider_names'][0]}")
+        if not entry["writable"]:
+            raise HTTPException(status_code=400, detail=f"capability is not writable for {entry['provider_names'][0]}")
+    first_entry = entries[0]
+    unified = _unified_entry(
+        scope=req.scope,
+        category=req.category,
+        capability_id=first_entry["capability_id"],
+        capability_name=first_entry["capability_name"],
+        language=first_entry["language"],
+        project_root=project_root,
+    )
+    if unified["exists"]:
+        raise HTTPException(status_code=409, detail="unified capability already exists")
+    if not unified["writable"]:
+        raise HTTPException(status_code=400, detail="unified capability is not writable")
     content = _new_capability_content(req)
     with _lock:
-        latest = _entry_from_candidate(candidate)
-        if latest["exists"]:
-            raise HTTPException(status_code=409, detail="capability appeared concurrently; refresh before creating")
-        _write_entry_if_unchanged(entry, None, content)
-    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
-    capability = _capability_for_tool(req.cwd, entry["capability_id"], req.scope)
-    return {"ok": True, "path": entry["path"], "capability": capability}
+        latest_unified_current, latest_unified_exists = _read_entry_current(unified)
+        if latest_unified_exists:
+            raise HTTPException(status_code=409, detail="unified capability appeared concurrently; refresh before creating")
+        latest_entries = _merged_entries_from_candidates(candidates)
+        for latest in latest_entries:
+            if latest["exists"]:
+                raise HTTPException(status_code=409, detail="capability appeared concurrently; refresh before creating")
+        _write_entry_if_unchanged(unified, latest_unified_current if latest_unified_exists else None, content)
+        for latest in latest_entries:
+            _write_entry_if_unchanged(latest, None, content)
+    changed_entries = [unified, *entries]
+    for entry in changed_entries:
+        await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    capability = _capability_for_tool(req.cwd, first_entry["capability_id"], req.scope)
+    return {"ok": True, "paths": [entry["path"] for entry in changed_entries], "capability": capability}
 
 
 @router.post("/capability")
