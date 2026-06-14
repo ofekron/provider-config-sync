@@ -107,7 +107,7 @@ def create_server() -> FastMCP:
                     "specifics": [_entry_summary(entry) for entry in capability["specifics"]],
                 }
             )
-        return {"capabilities": capabilities, "token_totals": payload["token_totals"]}
+        return {"capabilities": capabilities, "providers": payload["providers"], "token_totals": payload["token_totals"]}
 
     @server.tool()
     def read_provider_config_entry(cwd: str = "", entry_id: str | None = None, path: str | None = None) -> dict[str, Any]:
@@ -159,6 +159,60 @@ def create_server() -> FastMCP:
                     target_entry_id=target_entry_id,
                     expected_source=expected_source,
                     expected_target=expected_target,
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def auto_sync_provider_config_entry(
+        capability_id: str,
+        source_entry_id: str,
+        target_entry_id: str,
+        expected_source: str,
+        expected_target: str | None,
+        policy: dict[str, str],
+        cwd: str = "",
+        approved_hunk_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return await api.auto_sync(
+                api.AutoSyncRequest(
+                    cwd=cwd,
+                    capability_id=capability_id,
+                    source_entry_id=source_entry_id,
+                    target_entry_id=target_entry_id,
+                    expected_source=expected_source,
+                    expected_target=expected_target,
+                    policy=api.AutoSyncPolicy(**policy),
+                    approved_hunk_ids=approved_hunk_ids or [],
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def create_provider_config_capability(
+        scope: str,
+        category: str,
+        provider_kind: str,
+        name: str,
+        description: str = "",
+        instructions: str = "",
+        metadata: dict[str, Any] | None = None,
+        cwd: str = "",
+    ) -> dict[str, Any]:
+        try:
+            return await api.create_capability(
+                api.CreateCapabilityRequest(
+                    cwd=cwd,
+                    scope=scope,
+                    category=category,
+                    provider_kind=provider_kind,
+                    name=name,
+                    description=description,
+                    instructions=instructions,
+                    metadata=metadata or {},
                 )
             )
         except HTTPException as error:

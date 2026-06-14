@@ -82,6 +82,15 @@ def goose_app_html() -> str:
     }
     button.primary { background: var(--accent); border-color: var(--accent); color: white; }
     button:disabled { cursor: not-allowed; opacity: .5; }
+    button.icon {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      font-size: 16px;
+      line-height: 1;
+    }
     .main {
       display: grid;
       grid-template-columns: 310px minmax(0, 1fr);
@@ -110,6 +119,39 @@ def goose_app_html() -> str:
     .stat { padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
     .stat b { display: block; font-size: 16px; }
     .list { padding: 8px; display: grid; gap: 6px; }
+    .cap-group { display: grid; gap: 6px; }
+    .cap-group-head {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+      width: 100%;
+      padding: 6px 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    .cap-group-head b {
+      color: var(--text);
+      font-size: 12px;
+      text-transform: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cap-group-count {
+      min-width: 20px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 1px 6px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .cap-group-items { display: grid; gap: 6px; }
+    .cap-group.collapsed .cap-group-items { display: none; }
     .cap {
       display: grid;
       gap: 4px;
@@ -125,6 +167,10 @@ def goose_app_html() -> str:
     .pill.diff { color: var(--warn); }
     .pill.ok { color: var(--good); }
     .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); gap: 12px; align-items: start; }
+    .create-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
+    .create-grid .wide { grid-column: span 2; }
+    .create-grid .full { grid-column: 1 / -1; }
+    .create-grid textarea { min-height: 92px; }
     .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
     .panel-head {
       display: flex;
@@ -148,8 +194,60 @@ def goose_app_html() -> str:
     .entry.active { border-color: var(--accent); }
     .entry.missing { opacity: .75; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
     .status { min-height: 20px; color: var(--muted); }
     .error { color: var(--bad); }
+    .compare { margin-top: 12px; display: grid; gap: 12px; }
+    .compare-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+    .compare-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .diff-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      min-width: 720px;
+      overflow: hidden;
+    }
+    .diff-side { min-width: 0; border-right: 1px solid var(--line); }
+    .diff-side:last-child { border-right: 0; }
+    .diff-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .diff-line {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      min-height: 22px;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 45%);
+    }
+    .diff-line:last-child { border-bottom: 0; }
+    .empty-state {
+      min-height: 58px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel-2), transparent 35%);
+      font-size: 12px;
+    }
+    .ln { padding: 2px 8px; color: var(--muted); text-align: right; user-select: none; }
+    .code { padding: 2px 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .same .code { color: var(--muted); }
+    .add .code { background: color-mix(in srgb, var(--good), transparent 82%); }
+    .remove .code { background: color-mix(in srgb, var(--bad), transparent 84%); }
     @media (max-width: 760px) {
       body { overflow: auto; }
       .shell {
@@ -191,6 +289,11 @@ def goose_app_html() -> str:
         min-width: min(78vw, 280px);
         scroll-snap-align: start;
       }
+      .cap-group {
+        min-width: min(78vw, 280px);
+        scroll-snap-align: start;
+      }
+      .cap-group .cap { min-width: 0; }
       .content {
         overflow: visible;
         padding: 10px;
@@ -199,6 +302,9 @@ def goose_app_html() -> str:
         grid-template-columns: 1fr;
         gap: 10px;
       }
+      .create-grid { grid-template-columns: 1fr; }
+      .create-grid .wide,
+      .create-grid .full { grid-column: auto; }
       .panel-head {
         align-items: flex-start;
         flex-wrap: wrap;
@@ -215,6 +321,10 @@ def goose_app_html() -> str:
         grid-template-columns: 1fr 1fr;
       }
       .row button { width: 100%; }
+      .toolbar { justify-content: flex-start; }
+      .toolbar button { width: 34px; }
+      .compare-head { grid-template-columns: 1fr; }
+      .compare { overflow-x: auto; }
     }
     @media (max-width: 420px) {
       h1 { font-size: 15px; }
@@ -247,6 +357,53 @@ def goose_app_html() -> str:
         <div class="list" id="capabilities"></div>
       </aside>
       <main class="content">
+        <section class="panel">
+          <div class="panel-head">
+            <strong>Add capability</strong>
+          </div>
+          <div class="panel-body">
+            <div class="create-grid">
+              <div>
+                <label for="newScope">Scope</label>
+                <select id="newScope">
+                  <option value="project">Project</option>
+                  <option value="global">Global</option>
+                </select>
+              </div>
+              <div>
+                <label for="newCategory">Type</label>
+                <select id="newCategory">
+                  <option value="command">Command</option>
+                  <option value="skill">Skill</option>
+                  <option value="agent">Agent</option>
+                </select>
+              </div>
+              <div>
+                <label for="newProvider">Provider</label>
+                <select id="newProvider"></select>
+              </div>
+              <div>
+                <button class="primary" id="createCapability">Add</button>
+              </div>
+              <div class="wide">
+                <label for="newName">Name</label>
+                <input id="newName" placeholder="review">
+              </div>
+              <div class="wide">
+                <label for="newDescription">Description</label>
+                <input id="newDescription" placeholder="Review code">
+              </div>
+              <div class="full">
+                <label for="newInstructions">Instructions</label>
+                <textarea id="newInstructions" spellcheck="false" placeholder="Write the capability instructions here."></textarea>
+              </div>
+              <div class="full">
+                <label for="newMetadata">Metadata JSON</label>
+                <textarea id="newMetadata" spellcheck="false">{}</textarea>
+              </div>
+            </div>
+          </div>
+        </section>
         <div class="grid">
           <section class="panel">
             <div class="panel-head">
@@ -262,7 +419,7 @@ def goose_app_html() -> str:
               <textarea id="content" spellcheck="false"></textarea>
               <div class="row">
                 <button class="primary" id="save">Save file</button>
-                <button id="reset">Reset edits</button>
+                <button class="icon" id="reset" title="Reset edits" aria-label="Reset edits">↩</button>
               </div>
               <div class="status" id="status"></div>
             </div>
@@ -277,6 +434,7 @@ def goose_app_html() -> str:
             </div>
           </section>
         </div>
+        <section class="compare" id="compare"></section>
       </main>
     </div>
   </div>
@@ -344,7 +502,7 @@ def goose_app_html() -> str:
     }
 
     const app = new McpApp();
-    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "" };
+    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "", entryContents: new Map(), collapsedGroups: new Set() };
     const $ = id => document.getElementById(id);
 
     function setStatus(message, isError) {
@@ -362,23 +520,177 @@ def goose_app_html() -> str:
       return (providers || entry.role) + " - " + entry.label;
     }
 
+    function groupTitle(capability) {
+      return capability.scope + " / " + capability.category;
+    }
+
+    function iconButton(symbol, label, onClick, disabled) {
+      const button = document.createElement("button");
+      button.className = "icon";
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.textContent = symbol;
+      button.disabled = !!disabled;
+      button.onclick = onClick;
+      return button;
+    }
+
+    async function readEntry(entry) {
+      if (state.entryContents.has(entry.entry_id)) return state.entryContents.get(entry.entry_id);
+      if (!entry.exists) {
+        state.entryContents.set(entry.entry_id, "");
+        return "";
+      }
+      const full = await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: entry.entry_id });
+      state.entryContents.set(entry.entry_id, full.content || "");
+      if (state.entry && state.entry.entry_id === full.entry_id) state.entry = full;
+      return full.content || "";
+    }
+
+    function splitLines(content) {
+      if (!content) return [];
+      const lines = content.split("\n");
+      if (lines.length && lines[lines.length - 1] === "") lines.pop();
+      return lines;
+    }
+
+    function diffRows(unifiedContent, specificContent) {
+      const unified = splitLines(unifiedContent);
+      const specific = splitLines(specificContent);
+      const dp = Array.from({ length: unified.length + 1 }, () => Array(specific.length + 1).fill(0));
+      for (let i = unified.length - 1; i >= 0; i -= 1) {
+        for (let j = specific.length - 1; j >= 0; j -= 1) {
+          dp[i][j] = unified[i] === specific[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+      }
+      const rows = [];
+      let i = 0;
+      let j = 0;
+      while (i < unified.length || j < specific.length) {
+        if (i < unified.length && j < specific.length && unified[i] === specific[j]) {
+          rows.push({ kind: "same", unifiedLine: i + 1, specificLine: j + 1, unifiedText: unified[i], specificText: specific[j] });
+          i += 1;
+          j += 1;
+        } else if (j >= specific.length || (i < unified.length && dp[i + 1][j] >= dp[i][j + 1])) {
+          rows.push({ kind: "remove", unifiedLine: i + 1, specificLine: "", unifiedText: unified[i], specificText: "" });
+          i += 1;
+        } else {
+          rows.push({ kind: "add", unifiedLine: "", specificLine: j + 1, unifiedText: "", specificText: specific[j] });
+          j += 1;
+        }
+      }
+      return rows.length ? rows : [{ kind: "same", unifiedLine: "", specificLine: "", unifiedText: "", specificText: "" }];
+    }
+
+    function renderDiffSide(rows, side) {
+      const fragment = document.createDocumentFragment();
+      for (const row of rows) {
+        const line = document.createElement("div");
+        const text = side === "unified" ? row.unifiedText : row.specificText;
+        const lineNumber = side === "unified" ? row.unifiedLine : row.specificLine;
+        line.className = "diff-line " + (text ? row.kind : row.kind === "same" ? "same" : "remove");
+        line.innerHTML = "<span class='ln'></span><span class='code'></span>";
+        line.children[0].textContent = lineNumber;
+        line.children[1].textContent = text;
+        fragment.appendChild(line);
+      }
+      return fragment;
+    }
+
+    function emptyState(message) {
+      const element = document.createElement("div");
+      element.className = "empty-state";
+      element.textContent = message;
+      return element;
+    }
+
+    async function renderCompare() {
+      const container = $("compare");
+      container.innerHTML = "";
+      if (!state.capability) return;
+      const unified = state.capability.unified;
+      const specifics = state.capability.specifics || [];
+      const unifiedContent = await readEntry(unified);
+      for (const specific of specifics) {
+        const specificContent = await readEntry(specific);
+        const rows = diffRows(unifiedContent, specificContent);
+        const card = document.createElement("article");
+        card.className = "compare-card";
+        card.innerHTML =
+          "<div class='compare-head'><div><strong></strong><div class='meta'></div></div><div class='toolbar'></div></div>" +
+          "<div class='diff-grid'><div class='diff-side'><div class='diff-title'><span>Unified</span><span></span></div></div>" +
+          "<div class='diff-side'><div class='diff-title'><span>Specific</span><span></span></div></div></div>";
+        card.querySelector("strong").textContent = entryTitle(specific);
+        card.querySelector(".meta").textContent = specific.path;
+        const toolbar = card.querySelector(".toolbar");
+        const dirty = state.entry && $("content").value !== state.original;
+        toolbar.appendChild(iconButton("→", "Apply unified to specific", () => applyPair(unified, specific), dirty || !specific.writable || !unified.exists));
+        toolbar.appendChild(iconButton("←", "Apply specific to unified", () => applyPair(specific, unified), dirty || !unified.writable || !specific.exists));
+        toolbar.appendChild(iconButton("✦", "AI auto-merge into specific", () => aiMergePair(unified, specific), dirty || !specific.writable || !unified.exists));
+        const sides = card.querySelectorAll(".diff-side");
+        card.querySelectorAll(".diff-title span")[1].textContent = unified.exists ? tokens(unified.token_count) + " tokens" : "missing";
+        card.querySelectorAll(".diff-title span")[3].textContent = specific.exists ? tokens(specific.token_count) + " tokens" : "missing";
+        if (!unifiedContent) sides[0].appendChild(emptyState(unified.exists ? "Unified is empty" : "Unified is missing"));
+        if (!specificContent) sides[1].appendChild(emptyState(specific.exists ? "Specific is empty" : "Specific is missing"));
+        sides[0].appendChild(renderDiffSide(rows, "unified"));
+        sides[1].appendChild(renderDiffSide(rows, "specific"));
+        container.appendChild(card);
+      }
+      app.resize();
+    }
+
     function renderList() {
       const capabilities = (state.payload && state.payload.capabilities) || [];
       $("capabilities").innerHTML = "";
+      const groups = new Map();
       for (const capability of capabilities) {
-        const button = document.createElement("button");
-        button.className = "cap" + (state.capability && state.capability.id === capability.id ? " active" : "");
-        button.innerHTML = "<strong></strong><span class='meta'></span><span></span>";
-        button.children[0].textContent = capability.name;
-        button.children[1].textContent = capability.scope + " / " + capability.category;
-        button.children[2].innerHTML =
-          "<span class='pill " + (capability.has_diffs ? "diff" : "ok") + "'>" + (capability.has_diffs ? "diff" : "aligned") + "</span>" +
-          "<span class='pill'>" + tokens(capability.total_token_count) + " tokens</span>" +
-          "<span class='pill'>" + capability.specific_count + " files</span>";
-        button.onclick = () => selectCapability(capability.id);
-        $("capabilities").appendChild(button);
+        const key = groupTitle(capability);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(capability);
+      }
+      for (const [key, items] of groups) {
+        const group = document.createElement("section");
+        const collapsed = state.collapsedGroups.has(key);
+        group.className = "cap-group" + (collapsed ? " collapsed" : "");
+        group.innerHTML = "<button class='cap-group-head'><span></span><b></b><span class='cap-group-count'></span></button><div class='cap-group-items'></div>";
+        group.querySelector(".cap-group-head span").textContent = collapsed ? "▸" : "▾";
+        group.querySelector("b").textContent = key;
+        group.querySelector(".cap-group-count").textContent = items.length;
+        group.querySelector(".cap-group-head").onclick = () => {
+          if (state.collapsedGroups.has(key)) state.collapsedGroups.delete(key);
+          else state.collapsedGroups.add(key);
+          renderList();
+        };
+        const body = group.querySelector(".cap-group-items");
+        for (const capability of items) {
+          const button = document.createElement("button");
+          button.className = "cap" + (state.capability && state.capability.id === capability.id ? " active" : "");
+          button.innerHTML = "<strong></strong><span class='meta'></span><span></span>";
+          button.children[0].textContent = capability.name;
+          button.children[1].textContent = capability.scope + " / " + capability.category;
+          button.children[2].innerHTML =
+            "<span class='pill " + (capability.has_diffs ? "diff" : "ok") + "'>" + (capability.has_diffs ? "diff" : "aligned") + "</span>" +
+            "<span class='pill'>" + tokens(capability.total_token_count) + " tokens</span>" +
+            "<span class='pill'>" + capability.specific_count + " files</span>";
+          button.onclick = () => selectCapability(capability.id);
+          body.appendChild(button);
+        }
+        $("capabilities").appendChild(group);
       }
       app.resize();
+    }
+
+    function renderProviders() {
+      const providers = (state.payload && state.payload.providers) || [];
+      const current = $("newProvider").value;
+      $("newProvider").innerHTML = "";
+      for (const provider of providers) {
+        const option = document.createElement("option");
+        option.value = provider.kind;
+        option.textContent = provider.name + " (" + provider.kind + ")";
+        $("newProvider").appendChild(option);
+      }
+      if (providers.some(provider => provider.kind === current)) $("newProvider").value = current;
     }
 
     function renderCapability() {
@@ -389,6 +701,7 @@ def goose_app_html() -> str:
       $("selectedName").textContent = capability.name;
       $("selectedMeta").textContent = capability.scope + " / " + capability.category + " / " + tokens(capability.total_token_count) + " tokens";
       state.entries = [capability.unified].concat(capability.specifics || []);
+      state.entryContents = new Map();
       for (const entry of state.entries) {
         const option = document.createElement("option");
         option.value = entry.entry_id;
@@ -396,6 +709,7 @@ def goose_app_html() -> str:
         $("entrySelect").appendChild(option);
       }
       selectEntry(state.entry && state.entry.entry_id || state.entries[0].entry_id);
+      renderCompare().catch(error => setStatus(error.message, true));
     }
 
     function renderTargets() {
@@ -406,16 +720,19 @@ def goose_app_html() -> str:
       if (!source || !state.capability) return;
       for (const target of state.entries) {
         if (target.entry_id === source.entry_id) continue;
-        const button = document.createElement("button");
-        button.className = "entry" + (target.exists ? "" : " missing");
-        button.innerHTML = "<strong></strong><span class='meta'></span><span class='meta'></span>";
-        button.children[0].textContent = "Apply to " + entryTitle(target);
-        button.children[1].textContent = target.path;
-        button.children[2].textContent = dirty ? "Save source before applying" : target.exists ? tokens(target.token_count) + " tokens" : "new file";
-        button.disabled = dirty || !target.writable || !source.exists;
-        button.onclick = () => applyTo(target);
-        $("targets").appendChild(button);
+        const item = document.createElement("div");
+        item.className = "entry" + (target.exists ? "" : " missing");
+        item.innerHTML = "<strong></strong><span class='meta'></span><span class='meta'></span><div class='toolbar'></div>";
+        item.children[0].textContent = entryTitle(target);
+        item.children[1].textContent = target.path;
+        item.children[2].textContent = dirty ? "Save source before applying" : target.exists ? tokens(target.token_count) + " tokens" : "new file";
+        item.querySelector(".toolbar").appendChild(iconButton("→", "Apply selected file to target", () => applyPair(source, target), dirty || !target.writable || !source.exists));
+        if (source.role !== "unified" && target.role === "unified") {
+          item.querySelector(".toolbar").appendChild(iconButton("✦", "AI auto-merge selected file into unified", () => aiMergePair(source, target), dirty || !target.writable || !source.exists));
+        }
+        $("targets").appendChild(item);
       }
+      renderCompare().catch(error => setStatus(error.message, true));
       app.resize();
     }
 
@@ -424,12 +741,14 @@ def goose_app_html() -> str:
       setStatus("Loading...", false);
       try {
         state.payload = await app.callTool("list_provider_config_capabilities", { cwd: state.cwd });
+        state.entryContents = new Map();
         const totals = state.payload.token_totals || {};
         $("unifiedTokens").textContent = tokens(totals.unified);
         $("specificTokens").textContent = tokens(totals.specifics);
-        $("totalTokens").textContent = tokens(totals.total);
+        $("totalTokens").textContent = tokens(totals.all_tracked);
         state.capability = (state.payload.capabilities || [])[0] || null;
         state.entry = null;
+        renderProviders();
         renderList();
         renderCapability();
         setStatus(state.capability ? "" : "No capabilities found.", false);
@@ -453,6 +772,7 @@ def goose_app_html() -> str:
       try {
         state.entry = await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: entryId });
         state.original = state.entry.content || "";
+        state.entryContents.set(entryId, state.original);
         $("content").value = state.original;
         renderTargets();
         setStatus("", false);
@@ -482,20 +802,19 @@ def goose_app_html() -> str:
       }
     }
 
-    async function applyTo(target) {
-      if (!state.capability || !state.entry) return;
+    async function applyPair(source, target) {
+      if (!state.capability || !source || !target) return;
       setStatus("Applying...", false);
       try {
-        const targetFull = target.exists
-          ? await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: target.entry_id })
-          : null;
+        const sourceContent = state.entry && source.entry_id === state.entry.entry_id ? $("content").value : await readEntry(source);
+        const targetContent = target.exists ? await readEntry(target) : null;
         await app.callTool("apply_provider_config_entry", {
           cwd: state.cwd,
           capability_id: state.capability.capability_id,
-          source_entry_id: state.entry.entry_id,
+          source_entry_id: source.entry_id,
           target_entry_id: target.entry_id,
-          expected_source: $("content").value,
-          expected_target: targetFull ? targetFull.content : null
+          expected_source: sourceContent,
+          expected_target: targetContent
         });
         await load();
         setStatus("Applied.", false);
@@ -504,10 +823,61 @@ def goose_app_html() -> str:
       }
     }
 
+    async function aiMergePair(source, target) {
+      if (!state.capability || !source || !target) return;
+      setStatus("AI merging...", false);
+      try {
+        const sourceContent = state.entry && source.entry_id === state.entry.entry_id ? $("content").value : await readEntry(source);
+        const targetContent = target.exists ? await readEntry(target) : null;
+        const result = await app.callTool("auto_sync_provider_config_entry", {
+          cwd: state.cwd,
+          capability_id: state.capability.capability_id,
+          source_entry_id: source.entry_id,
+          target_entry_id: target.entry_id,
+          expected_source: sourceContent,
+          expected_target: targetContent,
+          policy: { additive: "llm", removal: "llm", change: "llm" }
+        });
+        await load();
+        setStatus("AI merged " + result.applied_count + " hunks; " + result.pending_count + " pending.", false);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    async function createCapability() {
+      setStatus("Creating capability...", false);
+      try {
+        const metadataText = $("newMetadata").value.trim() || "{}";
+        const metadata = JSON.parse(metadataText);
+        if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") throw new Error("Metadata JSON must be an object.");
+        const result = await app.callTool("create_provider_config_capability", {
+          cwd: state.cwd,
+          scope: $("newScope").value,
+          category: $("newCategory").value,
+          provider_kind: $("newProvider").value,
+          name: $("newName").value.trim(),
+          description: $("newDescription").value,
+          instructions: $("newInstructions").value,
+          metadata
+        });
+        await load();
+        if (result && result.capability) selectCapability(result.capability.id);
+        $("newName").value = "";
+        $("newDescription").value = "";
+        $("newInstructions").value = "";
+        $("newMetadata").value = "{}";
+        setStatus("Capability added.", false);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
     $("load").onclick = load;
     $("reload").onclick = load;
     $("save").onclick = save;
-    $("reset").onclick = () => { $("content").value = state.original; renderTargets(); };
+    $("createCapability").onclick = createCapability;
+    $("reset").onclick = () => { $("content").value = state.original; if (state.entry) state.entryContents.set(state.entry.entry_id, state.original); renderTargets(); };
     $("content").oninput = renderTargets;
     $("entrySelect").onchange = event => selectEntry(event.target.value);
     window.addEventListener("resize", () => app.resize());
