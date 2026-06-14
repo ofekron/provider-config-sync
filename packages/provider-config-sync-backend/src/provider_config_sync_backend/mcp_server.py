@@ -107,7 +107,7 @@ def create_server() -> FastMCP:
                     "specifics": [_entry_summary(entry) for entry in capability["specifics"]],
                 }
             )
-        return {"capabilities": capabilities, "token_totals": payload["token_totals"]}
+        return {"capabilities": capabilities, "providers": payload["providers"], "token_totals": payload["token_totals"]}
 
     @server.tool()
     def read_provider_config_entry(cwd: str = "", entry_id: str | None = None, path: str | None = None) -> dict[str, Any]:
@@ -186,6 +186,33 @@ def create_server() -> FastMCP:
                     expected_target=expected_target,
                     policy=api.AutoSyncPolicy(**policy),
                     approved_hunk_ids=approved_hunk_ids or [],
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def create_provider_config_capability(
+        scope: str,
+        category: str,
+        provider_kind: str,
+        name: str,
+        description: str = "",
+        instructions: str = "",
+        metadata: dict[str, Any] | None = None,
+        cwd: str = "",
+    ) -> dict[str, Any]:
+        try:
+            return await api.create_capability(
+                api.CreateCapabilityRequest(
+                    cwd=cwd,
+                    scope=scope,
+                    category=category,
+                    provider_kind=provider_kind,
+                    name=name,
+                    description=description,
+                    instructions=instructions,
+                    metadata=metadata or {},
                 )
             )
         except HTTPException as error:

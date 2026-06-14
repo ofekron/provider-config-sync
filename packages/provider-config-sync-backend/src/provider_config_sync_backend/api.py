@@ -19,7 +19,7 @@ from typing import Any, Callable
 
 import yaml
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -1886,6 +1886,10 @@ def _discover(cwd: str) -> dict:
     return {
         "files": files,
         "capabilities": capabilities,
+        "providers": [
+            {"kind": provider["kind"], "name": provider.get("name") or provider["kind"]}
+            for provider in providers
+        ],
         "token_totals": _token_totals(capabilities),
         "groups": {
             scope: [
@@ -2301,6 +2305,64 @@ class RestoreNativeFileRequest(BaseModel):
     expected_content: str | None = None
 
 
+class CreateCapabilityRequest(BaseModel):
+    cwd: str = ""
+    scope: str
+    category: str
+    provider_kind: str
+    name: str
+    description: str = ""
+    instructions: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+def _provider_by_kind(provider_kind: str) -> dict:
+    for provider in _provider_records():
+        if provider["kind"] == provider_kind:
+            return provider
+    raise HTTPException(status_code=400, detail="unknown provider kind")
+
+
+def _project_root_for_scope(scope: str, cwd: str) -> Path | None:
+    if scope == "global":
+        return None
+    if scope == "project":
+        return _local_project_root(cwd)
+    raise HTTPException(status_code=400, detail="scope must be global or project")
+
+
+def _new_capability_candidate(req: CreateCapabilityRequest, provider: dict, project_root: Path | None) -> Candidate:
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="capability name is required")
+    if req.category == "agent":
+        candidates = _agent_candidates(provider, req.scope, {name}, project_root)
+    elif req.category == "command":
+        candidates = _command_candidates(provider, req.scope, {name}, project_root)
+    elif req.category == "skill":
+        if req.scope == "global":
+            candidates = _global_skill_candidates(provider, {name})
+        elif project_root is not None:
+            candidates = _project_skill_candidates(provider, project_root, req.cwd, {(".", name)})
+        else:
+            candidates = []
+    else:
+        raise HTTPException(status_code=400, detail="category must be agent, command, or skill")
+    if not candidates:
+        raise HTTPException(status_code=400, detail="provider does not support creating that capability")
+    return candidates[0]
+
+
+def _new_capability_content(req: CreateCapabilityRequest) -> str:
+    item = {
+        "name": req.name,
+        "description": req.description,
+        "instructions": req.instructions,
+        "metadata": req.metadata or {},
+    }
+    return _normalized_common_item_from_tool({"category": req.category}, item, req.name)
+
+
 @router.put("/file")
 async def write_native_file(req: WriteNativeFileRequest):
     entries = _entry_map(req.cwd)
@@ -2317,6 +2379,31 @@ async def write_native_file(req: WriteNativeFileRequest):
         _write_entry_if_unchanged(entry, req.expected_content, req.content)
     await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
     return {"ok": True, "path": entry["path"]}
+
+
+async def create_capability(req: CreateCapabilityRequest):
+    provider = _provider_by_kind(req.provider_kind)
+    project_root = _project_root_for_scope(req.scope, req.cwd)
+    candidate = _new_capability_candidate(req, provider, project_root)
+    entry = _entry_from_candidate(candidate)
+    if entry["exists"]:
+        raise HTTPException(status_code=409, detail="capability already exists for that provider")
+    if not entry["writable"]:
+        raise HTTPException(status_code=400, detail="capability is not writable")
+    content = _new_capability_content(req)
+    with _lock:
+        latest = _entry_from_candidate(candidate)
+        if latest["exists"]:
+            raise HTTPException(status_code=409, detail="capability appeared concurrently; refresh before creating")
+        _write_entry_if_unchanged(entry, None, content)
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    capability = _capability_for_tool(req.cwd, entry["capability_id"], req.scope)
+    return {"ok": True, "path": entry["path"], "capability": capability}
+
+
+@router.post("/capability")
+async def create_capability_route(req: CreateCapabilityRequest):
+    return await create_capability(req)
 
 
 @router.post("/file/restore")

@@ -134,6 +134,10 @@ def goose_app_html() -> str:
     .pill.diff { color: var(--warn); }
     .pill.ok { color: var(--good); }
     .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); gap: 12px; align-items: start; }
+    .create-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; align-items: end; }
+    .create-grid .wide { grid-column: span 2; }
+    .create-grid .full { grid-column: 1 / -1; }
+    .create-grid textarea { min-height: 92px; }
     .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
     .panel-head {
       display: flex;
@@ -250,6 +254,9 @@ def goose_app_html() -> str:
         grid-template-columns: 1fr;
         gap: 10px;
       }
+      .create-grid { grid-template-columns: 1fr; }
+      .create-grid .wide,
+      .create-grid .full { grid-column: auto; }
       .panel-head {
         align-items: flex-start;
         flex-wrap: wrap;
@@ -302,6 +309,53 @@ def goose_app_html() -> str:
         <div class="list" id="capabilities"></div>
       </aside>
       <main class="content">
+        <section class="panel">
+          <div class="panel-head">
+            <strong>Add capability</strong>
+          </div>
+          <div class="panel-body">
+            <div class="create-grid">
+              <div>
+                <label for="newScope">Scope</label>
+                <select id="newScope">
+                  <option value="project">Project</option>
+                  <option value="global">Global</option>
+                </select>
+              </div>
+              <div>
+                <label for="newCategory">Type</label>
+                <select id="newCategory">
+                  <option value="command">Command</option>
+                  <option value="skill">Skill</option>
+                  <option value="agent">Agent</option>
+                </select>
+              </div>
+              <div>
+                <label for="newProvider">Provider</label>
+                <select id="newProvider"></select>
+              </div>
+              <div>
+                <button class="primary" id="createCapability">Add</button>
+              </div>
+              <div class="wide">
+                <label for="newName">Name</label>
+                <input id="newName" placeholder="review">
+              </div>
+              <div class="wide">
+                <label for="newDescription">Description</label>
+                <input id="newDescription" placeholder="Review code">
+              </div>
+              <div class="full">
+                <label for="newInstructions">Instructions</label>
+                <textarea id="newInstructions" spellcheck="false" placeholder="Write the capability instructions here."></textarea>
+              </div>
+              <div class="full">
+                <label for="newMetadata">Metadata JSON</label>
+                <textarea id="newMetadata" spellcheck="false">{}</textarea>
+              </div>
+            </div>
+          </div>
+        </section>
         <div class="grid">
           <section class="panel">
             <div class="panel-head">
@@ -542,6 +596,19 @@ def goose_app_html() -> str:
       app.resize();
     }
 
+    function renderProviders() {
+      const providers = (state.payload && state.payload.providers) || [];
+      const current = $("newProvider").value;
+      $("newProvider").innerHTML = "";
+      for (const provider of providers) {
+        const option = document.createElement("option");
+        option.value = provider.kind;
+        option.textContent = provider.name + " (" + provider.kind + ")";
+        $("newProvider").appendChild(option);
+      }
+      if (providers.some(provider => provider.kind === current)) $("newProvider").value = current;
+    }
+
     function renderCapability() {
       const capability = state.capability;
       $("entrySelect").innerHTML = "";
@@ -594,9 +661,10 @@ def goose_app_html() -> str:
         const totals = state.payload.token_totals || {};
         $("unifiedTokens").textContent = tokens(totals.unified);
         $("specificTokens").textContent = tokens(totals.specifics);
-        $("totalTokens").textContent = tokens(totals.total);
+        $("totalTokens").textContent = tokens(totals.all_tracked);
         state.capability = (state.payload.capabilities || [])[0] || null;
         state.entry = null;
+        renderProviders();
         renderList();
         renderCapability();
         setStatus(state.capability ? "" : "No capabilities found.", false);
@@ -693,9 +761,38 @@ def goose_app_html() -> str:
       }
     }
 
+    async function createCapability() {
+      setStatus("Creating capability...", false);
+      try {
+        const metadataText = $("newMetadata").value.trim() || "{}";
+        const metadata = JSON.parse(metadataText);
+        if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") throw new Error("Metadata JSON must be an object.");
+        const result = await app.callTool("create_provider_config_capability", {
+          cwd: state.cwd,
+          scope: $("newScope").value,
+          category: $("newCategory").value,
+          provider_kind: $("newProvider").value,
+          name: $("newName").value.trim(),
+          description: $("newDescription").value,
+          instructions: $("newInstructions").value,
+          metadata
+        });
+        await load();
+        if (result && result.capability) selectCapability(result.capability.id);
+        $("newName").value = "";
+        $("newDescription").value = "";
+        $("newInstructions").value = "";
+        $("newMetadata").value = "{}";
+        setStatus("Capability added.", false);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
     $("load").onclick = load;
     $("reload").onclick = load;
     $("save").onclick = save;
+    $("createCapability").onclick = createCapability;
     $("reset").onclick = () => { $("content").value = state.original; if (state.entry) state.entryContents.set(state.entry.entry_id, state.original); renderTargets(); };
     $("content").oninput = renderTargets;
     $("entrySelect").onchange = event => selectEntry(event.target.value);

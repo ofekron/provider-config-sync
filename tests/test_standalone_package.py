@@ -148,6 +148,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
             "write_provider_config_entry",
             "apply_provider_config_entry",
             "auto_sync_provider_config_entry",
+            "create_provider_config_capability",
             "upsert_unified_capability_item",
             "remove_unified_capability_item",
         }.issubset(names),
@@ -163,6 +164,8 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check(resource.mimeType == "text/html;profile=mcp-app", "Goose GUI resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
     check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
+    check("create_provider_config_capability" in content.content, "Goose GUI can create capabilities")
+    check('id="createCapability"' in content.content, "Goose GUI exposes add capability controls")
     check("auto_sync_provider_config_entry" in content.content, "Goose GUI can auto-merge with configured AI review")
     check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "Goose GUI always labels unified and specific diff panes")
     check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
@@ -355,6 +358,47 @@ def t_standalone_commands_convert_provider_formats() -> None:
             os.environ.pop("HOME", None)
         else:
             os.environ["HOME"] = old_home
+        shutil.rmtree(wipe)
+
+
+def t_create_capability_adds_provider_native_seed() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-create-capability-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")},
+                {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": str(wipe / "gemini")},
+                {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": str(wipe / "codex")},
+            ],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+        result = asyncio.run(
+            api.create_capability(
+                api.CreateCapabilityRequest(
+                    cwd=str(project),
+                    scope="project",
+                    category="command",
+                    provider_kind="claude",
+                    name="ship",
+                    description="Ship changes",
+                    instructions="Review, test, and ship.",
+                    metadata={"allowed-tools": "Read, Bash"},
+                )
+            )
+        )
+        check(result["capability"]["capability_id"] == "command-ship", "create capability returns rediscovered capability")
+        created = project / ".claude" / "commands" / "ship.md"
+        check(created.is_file(), "create capability writes provider-native seed file")
+        payload = api._discover(str(project))
+        command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-ship")
+        by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
+        check(set(by_kind) == {"claude", "codex", "gemini"}, "created capability discovers all provider targets")
+        check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Bash", "create capability preserves metadata")
+    finally:
         shutil.rmtree(wipe)
 
 
@@ -581,6 +625,7 @@ def main() -> int:
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
+    t_create_capability_adds_provider_native_seed()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()
     t_auto_sync_llm_can_review_one_hunk()
