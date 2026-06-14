@@ -1546,6 +1546,183 @@ def _token_totals(capabilities: list[dict]) -> dict:
     }
 
 
+_AUTO_SYNC_OPERATIONS = ("additive", "removal", "change")
+_AUTO_SYNC_MODES = ("off", "auto", "review", "llm")
+_AUTO_SYNC_DEFAULT_POLICY = {operation: "off" for operation in _AUTO_SYNC_OPERATIONS}
+
+
+def _settings_path() -> Path:
+    return _sync_home_source() / "provider-config-sync" / "settings.json"
+
+
+def _clean_auto_sync_policy(raw: object, *, allow_partial: bool) -> dict:
+    if not isinstance(raw, dict):
+        return {} if allow_partial else dict(_AUTO_SYNC_DEFAULT_POLICY)
+    cleaned: dict[str, str] = {}
+    for operation in _AUTO_SYNC_OPERATIONS:
+        value = raw.get(operation)
+        if isinstance(value, str) and value in _AUTO_SYNC_MODES:
+            cleaned[operation] = value
+        elif not allow_partial:
+            cleaned[operation] = "off"
+    return cleaned
+
+
+def _clean_auto_sync_settings(raw: object) -> dict:
+    if not isinstance(raw, dict):
+        raw = {}
+    projects: dict[str, dict] = {}
+    for cwd, project_value in (raw.get("projects") or {}).items():
+        if not isinstance(cwd, str) or not cwd or not isinstance(project_value, dict):
+            continue
+        project_capabilities: dict[str, dict] = {}
+        for capability_id, policy in (project_value.get("capabilities") or {}).items():
+            if not isinstance(capability_id, str) or not _valid_capability_id(capability_id):
+                continue
+            cleaned = _clean_auto_sync_policy(policy, allow_partial=True)
+            if cleaned:
+                project_capabilities[capability_id] = cleaned
+        project_policy = _clean_auto_sync_policy(project_value.get("policy"), allow_partial=True)
+        project_entry: dict[str, object] = {}
+        if project_policy:
+            project_entry["policy"] = project_policy
+        if project_capabilities:
+            project_entry["capabilities"] = project_capabilities
+        if project_entry:
+            projects[cwd] = project_entry
+    capabilities: dict[str, dict] = {}
+    for capability_id, policy in (raw.get("capabilities") or {}).items():
+        if not isinstance(capability_id, str) or not _valid_capability_id(capability_id):
+            continue
+        cleaned = _clean_auto_sync_policy(policy, allow_partial=True)
+        if cleaned:
+            capabilities[capability_id] = cleaned
+    return {
+        "global": _clean_auto_sync_policy(raw.get("global"), allow_partial=False),
+        "capabilities": capabilities,
+        "projects": projects,
+    }
+
+
+def _read_auto_sync_settings() -> dict:
+    path = _settings_path()
+    if not path.exists():
+        return _clean_auto_sync_settings({})
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=409, detail=f"provider sync settings are unreadable: {e}")
+    return _clean_auto_sync_settings(raw.get("auto_sync") if isinstance(raw, dict) else {})
+
+
+def _write_auto_sync_settings(settings: dict) -> None:
+    path = _settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({"auto_sync": settings}, indent=2, sort_keys=True) + "\n"
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as fh:
+        fh.write(payload)
+        tmp_path = Path(fh.name)
+    try:
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def _valid_capability_id(capability_id: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9._:-]{1,200}", capability_id))
+
+
+def _known_local_project_paths() -> set[str]:
+    return {
+        str(_expand_path(project.get("path", "")).resolve())
+        for project in _project_records_source()
+        if isinstance(project.get("path"), str) and project.get("path")
+    }
+
+
+def _normalize_settings_cwd(cwd: str) -> str:
+    if not cwd:
+        return ""
+    resolved = str(_local_project_root(cwd))
+    known = _known_local_project_paths()
+    if known and resolved not in known:
+        raise HTTPException(status_code=400, detail="unknown local project cwd")
+    return resolved
+
+
+def _effective_auto_sync_policy(settings: dict, cwd: str = "", capability_id: str = "") -> dict:
+    policy = dict(_AUTO_SYNC_DEFAULT_POLICY)
+    policy.update(settings["global"])
+    if capability_id:
+        policy.update(settings["capabilities"].get(capability_id, {}))
+    if cwd:
+        project = settings["projects"].get(cwd, {})
+        policy.update(project.get("policy", {}))
+        if capability_id:
+            policy.update((project.get("capabilities") or {}).get(capability_id, {}))
+    return policy
+
+
+def get_auto_sync_settings(cwd: str = "", capability_id: str = "") -> dict:
+    normalized_cwd = _normalize_settings_cwd(cwd)
+    if capability_id and not _valid_capability_id(capability_id):
+        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+    settings = _read_auto_sync_settings()
+    return {
+        **settings,
+        "effective": _effective_auto_sync_policy(settings, normalized_cwd, capability_id),
+    }
+
+
+def update_auto_sync_settings(req: AutoSyncSettingsPatch) -> dict:
+    if req.level not in {"global", "capability", "project", "project_capability"}:
+        raise HTTPException(status_code=400, detail="invalid auto-sync settings level")
+    capability_id = req.capability_id
+    if capability_id and not _valid_capability_id(capability_id):
+        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+    cwd = _normalize_settings_cwd(req.cwd)
+    settings = _read_auto_sync_settings()
+    cleaned = _clean_auto_sync_policy(req.policy, allow_partial=req.level != "global")
+    if req.level == "global":
+        settings["global"] = cleaned
+    elif req.level == "capability":
+        if not capability_id:
+            raise HTTPException(status_code=400, detail="capability_id is required")
+        if cleaned:
+            settings["capabilities"][capability_id] = cleaned
+        else:
+            settings["capabilities"].pop(capability_id, None)
+    elif req.level == "project":
+        if not cwd:
+            raise HTTPException(status_code=400, detail="cwd is required")
+        project = settings["projects"].setdefault(cwd, {})
+        if cleaned:
+            project["policy"] = cleaned
+        else:
+            project.pop("policy", None)
+        if not project.get("policy") and not project.get("capabilities"):
+            settings["projects"].pop(cwd, None)
+    else:
+        if not cwd or not capability_id:
+            raise HTTPException(status_code=400, detail="cwd and capability_id are required")
+        project = settings["projects"].setdefault(cwd, {})
+        capabilities = project.setdefault("capabilities", {})
+        if cleaned:
+            capabilities[capability_id] = cleaned
+        else:
+            capabilities.pop(capability_id, None)
+        if not capabilities:
+            project.pop("capabilities", None)
+        if not project.get("policy") and not project.get("capabilities"):
+            settings["projects"].pop(cwd, None)
+    _write_auto_sync_settings(settings)
+    return {
+        **settings,
+        "effective": _effective_auto_sync_policy(settings, cwd, capability_id),
+    }
+
+
 def _discover(cwd: str) -> dict:
     by_entry: dict[str, dict] = {}
     project_root: Path | None = None
@@ -1613,6 +1790,7 @@ def _discover(cwd: str) -> dict:
     files = [capability["unified"] for capability in capabilities]
     for capability in capabilities:
         files.extend(capability["specifics"])
+    normalized_cwd = str(project_root) if project_root is not None else ""
     return {
         "files": files,
         "capabilities": capabilities,
@@ -1625,6 +1803,7 @@ def _discover(cwd: str) -> dict:
             ]
             for scope in ("global", "project")
         },
+        "auto_settings": get_auto_sync_settings(normalized_cwd),
     }
 
 
@@ -1990,6 +2169,13 @@ class AutoSyncPolicy(BaseModel):
     additive: str = "off"
     removal: str = "off"
     change: str = "off"
+
+
+class AutoSyncSettingsPatch(BaseModel):
+    level: str
+    policy: dict[str, Any]
+    cwd: str = ""
+    capability_id: str = ""
 
 
 class AutoSyncRequest(BaseModel):
@@ -2473,6 +2659,19 @@ async def auto_sync(req: AutoSyncRequest):
         "log_head": log[:8],
         "log": log,
     }
+
+
+@router.get("/settings")
+async def get_auto_sync_settings_route(
+    cwd: str = Query("", description="Project cwd for project-scope overrides"),
+    capability_id: str = Query("", description="Capability id for effective policy"),
+):
+    return get_auto_sync_settings(cwd, capability_id)
+
+
+@router.patch("/settings")
+async def update_auto_sync_settings_route(req: AutoSyncSettingsPatch):
+    return update_auto_sync_settings(req)
 
 
 @router.post("/unified-capability-item")

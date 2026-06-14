@@ -430,6 +430,51 @@ def t_auto_sync_llm_mode_uses_configured_reviewer() -> None:
         shutil.rmtree(wipe)
 
 
+def t_auto_sync_settings_resolve_hierarchy() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-settings-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        api.configure(
+            provider_records=lambda: [{"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")}],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+        initial = api.get_auto_sync_settings(str(project), "instructions")
+        check(initial["effective"] == {"additive": "off", "removal": "off", "change": "off"}, "initial settings are off")
+        api.update_auto_sync_settings(api.AutoSyncSettingsPatch(
+            level="global",
+            policy={"additive": "auto", "removal": "off", "change": "off"},
+        ))
+        api.update_auto_sync_settings(api.AutoSyncSettingsPatch(
+            level="capability",
+            capability_id="instructions",
+            policy={"change": "review"},
+        ))
+        api.update_auto_sync_settings(api.AutoSyncSettingsPatch(
+            level="project",
+            cwd=str(project),
+            policy={"removal": "llm"},
+        ))
+        resolved = api.update_auto_sync_settings(api.AutoSyncSettingsPatch(
+            level="project_capability",
+            cwd=str(project),
+            capability_id="instructions",
+            policy={"change": "auto"},
+        ))
+        check(resolved["effective"] == {"additive": "auto", "removal": "llm", "change": "auto"}, "deepest settings override")
+        cleared = api.update_auto_sync_settings(api.AutoSyncSettingsPatch(
+            level="project_capability",
+            cwd=str(project),
+            capability_id="instructions",
+            policy={"change": "inherit"},
+        ))
+        check(cleared["effective"] == {"additive": "auto", "removal": "llm", "change": "review"}, "inherit removes deepest override")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
@@ -439,6 +484,7 @@ def main() -> int:
     t_standalone_commands_convert_provider_formats()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()
+    t_auto_sync_settings_resolve_hierarchy()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")
         for failure in FAILURES:
