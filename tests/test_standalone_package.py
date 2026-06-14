@@ -461,6 +461,35 @@ def t_unified_only_skill_is_discovered() -> None:
         shutil.rmtree(wipe)
 
 
+def t_global_disabled_agent_is_discovered() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-disabled-agent-"))
+    try:
+        agent = wipe / "claude" / "agents" / "reviewer.md.disabled"
+        agent.parent.mkdir(parents=True)
+        agent.write_text(
+            "---\n"
+            "name: reviewer\n"
+            "description: Reviews code\n"
+            "---\n"
+            "Read the diff and report risks.\n",
+            encoding="utf-8",
+        )
+        api.configure(
+            provider_records=lambda: [{"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")}],
+            project_records=lambda: [],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+
+        payload = api._discover("")
+        capability = next(capability for capability in payload["groups"]["global"] if capability["capability_id"] == "agent-reviewer")
+        by_kind = {entry["provider_kinds"][0]: entry for entry in capability["specifics"]}
+        check("claude" in by_kind, "disabled global Claude agent appears as a capability")
+        check(by_kind["claude"]["path"].endswith("reviewer.md.disabled"), "disabled global Claude agent keeps native path")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_create_capability_adds_provider_native_seed() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-create-capability-"))
     try:
@@ -736,6 +765,7 @@ def main() -> int:
     t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
     t_unified_only_skill_is_discovered()
+    t_global_disabled_agent_is_discovered()
     t_create_capability_adds_provider_native_seed()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()

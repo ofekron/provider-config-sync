@@ -580,6 +580,11 @@ def _agent_suffix(provider_kind: str) -> str:
     return ".toml" if provider_kind == "codex" else ".md"
 
 
+def _agent_scan_patterns(content_kind: str) -> list[str]:
+    suffix = ".toml" if content_kind == _CONTENT_TOML_AGENT else ".md"
+    return [f"*{suffix}", f"*{suffix}.disabled"]
+
+
 def _safe_agent_filename(name: str) -> str:
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "-", name).strip("-")
     if safe and safe not in {".", ".."} and Path(safe).name == safe:
@@ -869,13 +874,13 @@ def _agent_name_from_file(path: Path, content_kind: str) -> str | None:
 def _agent_names_in_root(root: Path, content_kind: str) -> set[str]:
     if not root.is_dir() or root.is_symlink():
         return set()
-    suffix = ".toml" if content_kind == _CONTENT_TOML_AGENT else ".md"
     names: set[str] = set()
-    for path in root.rglob(f"*{suffix}"):
-        if path.is_file() and not path.is_symlink():
-            name = _agent_name_from_file(path, content_kind)
-            if name:
-                names.add(name)
+    for pattern in _agent_scan_patterns(content_kind):
+        for path in root.rglob(pattern):
+            if path.is_file() and not path.is_symlink():
+                name = _agent_name_from_file(path, content_kind)
+                if name:
+                    names.add(name)
     return names
 
 
@@ -895,9 +900,10 @@ def _candidate_agent_paths(provider: dict, roots: list[Path], name: str) -> list
     for root in roots:
         if not root.is_dir() or root.is_symlink():
             continue
-        for path in root.rglob(f"*{suffix}"):
-            if path.is_file() and not path.is_symlink() and _agent_name_from_file(path, content_kind) == name:
-                existing.append(path)
+        for pattern in _agent_scan_patterns(content_kind):
+            for path in root.rglob(pattern):
+                if path.is_file() and not path.is_symlink() and _agent_name_from_file(path, content_kind) == name:
+                    existing.append(path)
     if existing:
         return existing
     return [roots[0] / f"{_safe_agent_filename(name)}{suffix}"] if roots else []
