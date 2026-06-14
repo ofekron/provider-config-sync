@@ -65,7 +65,7 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
 | Project memory | Claude project memory | unified capability tracking | unified capability tracking |
 | MCP servers | `.mcp.json` / settings | `config.toml` | `settings.json` |
 | Skills | `.claude/skills` | `.agents/skills` | `.agents/skills` / `.gemini/skills` |
-| Commands | `.claude/commands/*.md` | `~/.codex/prompts/*.md` | `.gemini/commands/*.toml` |
+| Commands / skills | `.claude/commands/*.md` | `.agents/skills/command-*/SKILL.md` | `.gemini/commands/*.toml` |
 | Custom agents | Markdown frontmatter | TOML | Markdown frontmatter |
 | Provider settings | JSON/settings | TOML | JSON/settings |
 
@@ -166,7 +166,7 @@ Environment:
   PROVIDER_CONFIG_SYNC_CONFIG=/absolute/path/to/provider-config-sync/provider-config-sync.json
 ```
 
-Install native commands/prompts into the providers themselves:
+Install native commands/skills into the providers themselves:
 
 ```bash
 provider-config-sync-install-agent-integrations
@@ -176,11 +176,11 @@ That installs:
 
 ```text
 ~/.claude/commands/provider-config-sync.md
-~/.codex/prompts/provider-config-sync.md
+~/.agents/skills/provider-config-sync/SKILL.md
 ~/.gemini/commands/provider-config-sync.toml
 ```
 
-Those commands tell Claude Code, Codex, and Gemini to use the unified capability form first, then apply the capability to the other configured providers.
+Those commands/skills tell Claude Code, Codex, and Gemini to use the unified capability form first, then apply the capability to the other configured providers.
 
 Run automatic reconciliation through your preferred CLI:
 
