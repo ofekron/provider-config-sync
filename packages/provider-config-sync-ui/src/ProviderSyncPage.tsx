@@ -761,7 +761,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
             </div>
             <div className="provider-sync-file-list">
               {capabilityGroups.map((group) => (
-                <section className="provider-sync-capability-group" key={group.category}>
+                <section
+                  className={`provider-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`}
+                  key={group.category}
+                >
                   <button
                     type="button"
                     className="provider-sync-capability-group-title"
@@ -771,7 +774,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                       [group.category]: !current[group.category],
                     }))}
                   >
-                    <span>{collapsedGroups[group.category] ? ">" : "v"}</span>
+                    <span className="provider-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
                     <span>{group.label}</span>
                     <small>{group.capabilities.length}</small>
                   </button>
