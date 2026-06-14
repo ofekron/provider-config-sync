@@ -7,6 +7,7 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import shutil
@@ -419,6 +420,47 @@ def t_standalone_commands_convert_provider_formats() -> None:
         shutil.rmtree(wipe)
 
 
+def t_unified_only_skill_is_discovered() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-unified-skill-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        sync_home = wipe / "sync-home"
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")},
+                {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": str(wipe / "codex")},
+            ],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: sync_home,
+            broadcast_changed=_noop,
+        )
+        digest = hashlib.sha256(str(project).encode("utf-8")).hexdigest()
+        unified = sync_home / "provider-config-sync" / "projects" / digest / "skill" / "skill-unified.json"
+        unified.parent.mkdir(parents=True)
+        unified.write_text(
+            json.dumps(
+                {
+                    "name": "unified",
+                    "description": "Unified-only skill",
+                    "instructions": "Use this shared skill.\n",
+                    "metadata": {},
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        payload = api._discover(str(project))
+        skill = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "skill-unified")
+        check(skill["category"] == "skill", "unified-only skill appears in project capabilities")
+        check(skill["unified"]["exists"], "unified-only skill keeps unified file entry")
+        check(skill["specifics"] == [], "unified-only skill has no provider-native entries")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_create_capability_adds_provider_native_seed() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-create-capability-"))
     try:
@@ -693,6 +735,7 @@ def main() -> int:
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
+    t_unified_only_skill_is_discovered()
     t_create_capability_adds_provider_native_seed()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()

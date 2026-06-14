@@ -1532,6 +1532,69 @@ def _capability_unified_path(
     return root / category / f"{capability_id}.{_capability_extension(language)}"
 
 
+def _unified_root(scope: str, project_root: Path | None) -> Path:
+    if scope == "global":
+        return _sync_home_source() / "provider-config-sync" / "global"
+    if project_root is None:
+        raise HTTPException(status_code=400, detail="project capability requires project root")
+    digest = hashlib.sha256(str(project_root).encode("utf-8")).hexdigest()
+    return _sync_home_source() / "provider-config-sync" / "projects" / digest
+
+
+def _language_from_unified_path(path: Path) -> str | None:
+    return {
+        ".json": "json",
+        ".md": "markdown",
+        ".toml": "toml",
+        ".txt": "plaintext",
+    }.get(path.suffix)
+
+
+def _capability_name_from_id(category: str, capability_id: str) -> str:
+    if category == "instructions" and capability_id == _INSTRUCTIONS_CAPABILITY_ID:
+        return _INSTRUCTIONS_CAPABILITY_NAME
+    if category == "memory" and capability_id == _MEMORY_CAPABILITY_ID:
+        return _MEMORY_CAPABILITY_NAME
+    if category == "config" and capability_id == _MCP_CAPABILITY_ID:
+        return _MCP_CAPABILITY_NAME
+    if category == "skill" and capability_id.startswith(_SKILL_CAPABILITY_PREFIX):
+        return _skill_capability_name("", capability_id.removeprefix(_SKILL_CAPABILITY_PREFIX))
+    if category == "agent" and capability_id.startswith(_AGENT_CAPABILITY_PREFIX):
+        return _agent_capability_name(capability_id.removeprefix(_AGENT_CAPABILITY_PREFIX))
+    if category == "command" and capability_id.startswith(_COMMAND_CAPABILITY_PREFIX):
+        return _command_capability_name(capability_id.removeprefix(_COMMAND_CAPABILITY_PREFIX))
+    return capability_id
+
+
+def _unified_capability_items(scope: str, project_root: Path | None) -> list[dict]:
+    root = _unified_root(scope, project_root)
+    if not root.is_dir() or root.is_symlink():
+        return []
+    items: list[dict] = []
+    for category_dir in sorted(root.iterdir(), key=lambda path: path.name):
+        if not category_dir.is_dir() or category_dir.is_symlink():
+            continue
+        category = category_dir.name
+        for path in sorted(category_dir.iterdir(), key=lambda item: item.name):
+            if not path.is_file() or path.is_symlink():
+                continue
+            language = _language_from_unified_path(path)
+            if language is None:
+                continue
+            capability_id = path.stem
+            items.append(
+                {
+                    "scope": scope,
+                    "category": category,
+                    "capability_id": capability_id,
+                    "capability_name": _capability_name_from_id(category, capability_id),
+                    "specifics": [],
+                    "language": language,
+                }
+            )
+    return items
+
+
 def _unified_entry(
     *,
     scope: str,
@@ -1568,7 +1631,7 @@ def _unified_entry(
     }
 
 
-def _capability_from_specifics(
+def _capability_from_item(
     *,
     scope: str,
     category: str,
@@ -1576,8 +1639,8 @@ def _capability_from_specifics(
     capability_name: str,
     specifics: list[dict],
     project_root: Path | None,
+    language: str,
 ) -> dict:
-    language = _capability_language(category, specifics)
     unified = _unified_entry(
         scope=scope,
         category=category,
@@ -1867,15 +1930,21 @@ def _discover(cwd: str) -> dict:
             },
         )
         item["specifics"].append(entry)
+    for item in _unified_capability_items("global", None):
+        by_capability.setdefault(_capability_key(item["scope"], item["category"], item["capability_id"]), item)
+    if project_root is not None:
+        for item in _unified_capability_items("project", project_root):
+            by_capability.setdefault(_capability_key(item["scope"], item["category"], item["capability_id"]), item)
 
     capabilities = [
-        _capability_from_specifics(
+        _capability_from_item(
             scope=item["scope"],
             category=item["category"],
             capability_id=item["capability_id"],
             capability_name=item["capability_name"],
             specifics=item["specifics"],
             project_root=project_root if item["scope"] == "project" else None,
+            language=item.get("language") or _capability_language(item["category"], item["specifics"]),
         )
         for item in sorted(by_capability.values(), key=lambda item: (item["scope"], item["capability_name"]))
     ]
