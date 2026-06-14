@@ -77,6 +77,7 @@ _project_records_source: Callable[[], list[dict]] = lambda: []
 _sync_home_source: Callable[[], Path] = _default_sync_home
 _encode_cwd_source: Callable[[str], str] = _default_encode_cwd
 _broadcast_changed_source: Callable[[str, str, str, str, str], Any] = _noop_broadcast_changed
+_llm_review_source: Callable[[dict[str, Any]], list[str]] | None = None
 
 
 def configure(
@@ -86,12 +87,14 @@ def configure(
     sync_home: Callable[[], Path] | None = None,
     encode_project_cwd: Callable[[str], str] | None = None,
     broadcast_changed: Callable[[str, str, str, str, str], Any] | None = None,
+    llm_review: Callable[[dict[str, Any]], list[str]] | None = None,
 ) -> None:
     global _provider_records_source
     global _project_records_source
     global _sync_home_source
     global _encode_cwd_source
     global _broadcast_changed_source
+    global _llm_review_source
     if provider_records is not None:
         _provider_records_source = provider_records
     if project_records is not None:
@@ -102,6 +105,8 @@ def configure(
         _encode_cwd_source = encode_project_cwd
     if broadcast_changed is not None:
         _broadcast_changed_source = broadcast_changed
+    if llm_review is not None:
+        _llm_review_source = llm_review
 
 
 @dataclass(frozen=True)
@@ -2284,7 +2289,7 @@ def _operation_for_hunk(rows: list[dict[str, Any]], target: str) -> str:
 
 def _policy_mode(policy: AutoSyncPolicy, operation: str) -> str:
     mode = getattr(policy, operation)
-    if mode not in {"off", "auto", "review"}:
+    if mode not in {"off", "auto", "review", "llm"}:
         raise HTTPException(status_code=400, detail=f"invalid auto-sync mode for {operation}")
     return mode
 
@@ -2309,6 +2314,60 @@ def _hunk_id(rows: list[dict[str, Any]], operation: str) -> str:
     ]
     digest = hashlib.sha256(json.dumps([operation, payload], sort_keys=True).encode("utf-8")).hexdigest()
     return f"h:{digest[:16]}"
+
+
+def _auto_sync_plan(
+    hunks: list[dict[str, Any]],
+    target_side: str,
+    policy: AutoSyncPolicy,
+    approved_hunk_ids: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    selected_rows: list[dict[str, Any]] = []
+    log: list[dict[str, Any]] = []
+    llm_candidates: list[dict[str, Any]] = []
+    for hunk in hunks:
+        rows = hunk["rows"]
+        operation = _operation_for_hunk(rows, target_side)
+        hunk_id = _hunk_id(rows, operation)
+        mode = _policy_mode(policy, operation)
+        status = "skipped"
+        if mode == "auto" or hunk_id in approved_hunk_ids:
+            selected_rows.extend(rows)
+            status = "applied"
+        elif mode == "review":
+            status = "pending"
+        elif mode == "llm":
+            llm_candidates.append({
+                "hunk_id": hunk_id,
+                "operation": operation,
+                "row_count": len(rows),
+                "preview": _hunk_preview(rows, target_side),
+                "rows": rows,
+            })
+        item = {
+            "hunk_id": hunk_id,
+            "operation": operation,
+            "mode": mode,
+            "status": status,
+            "row_count": len(rows),
+            "preview": _hunk_preview(rows, target_side),
+            "rows": rows,
+        }
+        log.append(item)
+    return selected_rows, log, llm_candidates
+
+
+def _llm_review_hunk_ids(context: dict[str, Any]) -> set[str]:
+    if _llm_review_source is None:
+        raise HTTPException(status_code=400, detail="LLM auto-sync review is not configured")
+    result = _llm_review_source(context)
+    if not isinstance(result, list) or not all(isinstance(item, str) for item in result):
+        raise HTTPException(status_code=502, detail="LLM auto-sync review returned invalid hunk ids")
+    valid = {item["hunk_id"] for item in context["candidates"]}
+    unknown = set(result) - valid
+    if unknown:
+        raise HTTPException(status_code=502, detail="LLM auto-sync review returned unknown hunk ids")
+    return set(result)
 
 
 @router.post("/apply")
@@ -2371,28 +2430,31 @@ async def auto_sync(req: AutoSyncRequest):
         unified_text = source_text if source["role"] == "unified" else target_text
         specific_text = source_text if source["role"] == "specific" else target_text
         hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
-        selected_rows: list[dict[str, Any]] = []
-        log: list[dict[str, Any]] = []
-        for hunk in hunks:
-            rows = hunk["rows"]
-            operation = _operation_for_hunk(rows, target_side)
-            hunk_id = _hunk_id(rows, operation)
-            mode = _policy_mode(req.policy, operation)
-            status = "skipped"
-            if mode == "auto" or hunk_id in approved:
-                selected_rows.extend(rows)
-                status = "applied"
-            elif mode == "review":
-                status = "pending"
-            log.append({
-                "hunk_id": hunk_id,
-                "operation": operation,
-                "mode": mode,
-                "status": status,
-                "row_count": len(rows),
-                "preview": _hunk_preview(rows, target_side),
-                "rows": rows,
-            })
+        selected_rows, log, llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
+    if llm_candidates:
+        approved.update(_llm_review_hunk_ids({
+            "capability_id": req.capability_id,
+            "source_label": source["label"],
+            "target_label": target["label"],
+            "source_role": source["role"],
+            "target_role": target["role"],
+            "target_side": target_side,
+            "candidates": llm_candidates,
+        }))
+    with _lock:
+        source_text, source_exists = _read_entry_current(source)
+        target_text, target_exists = _read_entry_current(target)
+        if not source_exists:
+            raise HTTPException(status_code=400, detail="source is not a readable sync entry")
+        if (
+            source_text != req.expected_source
+            or _expected_content(target_text, target_exists) != req.expected_target
+        ):
+            raise HTTPException(status_code=409, detail="file changed; refresh before applying")
+        unified_text = source_text if source["role"] == "unified" else target_text
+        specific_text = source_text if source["role"] == "specific" else target_text
+        hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
+        selected_rows, log, _llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
         next_target_text = _apply_rows_to_content(target_text, selected_rows, target_side) if selected_rows else target_text
         if next_target_text != target_text:
             _write_entry_if_unchanged(target, req.expected_target, next_target_text)
