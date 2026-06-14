@@ -12,6 +12,7 @@ import type {
   ProviderSyncDeleteCapabilityRequest,
   ProviderSyncResponse,
   ProviderSyncRestoreRequest,
+  ProviderSyncTransferCapabilityRequest,
   ProviderSyncWriteRequest,
 } from "@better-agent/provider-config-sync-core";
 
@@ -44,6 +45,7 @@ export interface ProviderSyncApiClient {
   restoreFile(body: ProviderSyncRestoreRequest): Promise<void>;
   deleteCapability(body: ProviderSyncDeleteCapabilityRequest): Promise<void>;
   createCapability(body: ProviderSyncCreateCapabilityRequest): Promise<ProviderSyncCreateCapabilityResponse>;
+  transferCapability(body: ProviderSyncTransferCapabilityRequest): Promise<ProviderSyncCreateCapabilityResponse>;
   apply(body: ProviderSyncApplyRequest): Promise<void>;
   autoSync(body: ProviderSyncAutoRequest): Promise<ProviderSyncAutoResponse>;
 }
@@ -97,6 +99,11 @@ export function createFetchProviderSyncClient(
       request<void>("/api/provider-sync/capability", { method: "DELETE", body: json(body) }),
     createCapability: (body) =>
       request<ProviderSyncCreateCapabilityResponse>("/api/provider-sync/capability", {
+        method: "POST",
+        body: json(body),
+      }),
+    transferCapability: (body) =>
+      request<ProviderSyncCreateCapabilityResponse>("/api/provider-sync/capability/transfer", {
         method: "POST",
         body: json(body),
       }),

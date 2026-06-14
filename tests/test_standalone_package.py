@@ -550,6 +550,83 @@ def t_create_capability_adds_provider_native_seed() -> None:
         shutil.rmtree(wipe)
 
 
+def t_transfer_capability_copies_and_moves_between_levels_and_projects() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-transfer-capability-"))
+    try:
+        project_a = (wipe / "project-a").resolve()
+        project_b = (wipe / "project-b").resolve()
+        project_a.mkdir()
+        project_b.mkdir()
+        claude_command = project_a / ".claude" / "commands" / "deploy.md"
+        claude_command.parent.mkdir(parents=True)
+        claude_command.write_text(
+            "---\n"
+            "description: Deploy service\n"
+            "---\n"
+            "Deploy the service.\n",
+            encoding="utf-8",
+        )
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")},
+                {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": str(wipe / "gemini")},
+            ],
+            project_records=lambda: [
+                {"path": str(project_a), "node_id": "primary"},
+                {"path": str(project_b), "node_id": "primary"},
+            ],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+        payload = api._discover(str(project_a))
+        command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-deploy")
+        expected = {
+            entry["entry_id"]: entry["content"] if entry["exists"] else None
+            for entry in [command["unified"], *command["specifics"]]
+        }
+        copied = asyncio.run(
+            api.transfer_capability(
+                api.TransferCapabilityRequest(
+                    cwd=str(project_a),
+                    scope="project",
+                    capability_id="command-deploy",
+                    target_scope="global",
+                    mode="copy",
+                    expected_contents=expected,
+                )
+            )
+        )
+        check(copied["capability"]["scope"] == "global", "copy capability returns global target")
+        check((wipe / "claude" / "commands" / "deploy.md").is_file(), "copy writes global Claude command")
+        check((wipe / "gemini" / "commands" / "deploy.toml").is_file(), "copy writes global Gemini command")
+        check(claude_command.is_file(), "copy leaves source command in place")
+
+        payload = api._discover(str(project_a))
+        command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-deploy")
+        expected = {
+            entry["entry_id"]: entry["content"] if entry["exists"] else None
+            for entry in [command["unified"], *command["specifics"]]
+        }
+        moved = asyncio.run(
+            api.transfer_capability(
+                api.TransferCapabilityRequest(
+                    cwd=str(project_a),
+                    scope="project",
+                    capability_id="command-deploy",
+                    target_cwd=str(project_b),
+                    target_scope="project",
+                    mode="move",
+                    expected_contents=expected,
+                )
+            )
+        )
+        check(moved["capability"]["scope"] == "project", "move capability returns project target")
+        check((project_b / ".claude" / "commands" / "deploy.md").is_file(), "move writes target project command")
+        check(not claude_command.exists(), "move deletes source project command")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_auto_sync_applies_auto_and_reviews_per_hunk() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-auto-"))
     try:
@@ -780,6 +857,7 @@ def main() -> int:
     t_unified_only_skill_is_discovered()
     t_global_disabled_agent_is_discovered()
     t_create_capability_adds_provider_native_seed()
+    t_transfer_capability_copies_and_moves_between_levels_and_projects()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()
     t_auto_sync_llm_can_review_one_hunk()

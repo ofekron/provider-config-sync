@@ -2398,6 +2398,16 @@ class CreateCapabilityRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class TransferCapabilityRequest(BaseModel):
+    cwd: str = ""
+    scope: str
+    capability_id: str
+    target_cwd: str = ""
+    target_scope: str
+    mode: str
+    expected_contents: dict[str, str | None]
+
+
 def _providers_by_kinds(provider_kinds: list[str]) -> list[dict]:
     requested = [kind for kind in dict.fromkeys(provider_kinds) if kind]
     if not requested:
@@ -2447,6 +2457,26 @@ def _new_capability_content(req: CreateCapabilityRequest) -> str:
         "metadata": req.metadata or {},
     }
     return _normalized_common_item_from_tool({"category": req.category}, item, req.name)
+
+
+def _common_item_name_from_capability(capability: dict) -> str:
+    source = capability["unified"] if capability["unified"]["exists"] else None
+    if source is None:
+        source = next((entry for entry in capability["specifics"] if entry["exists"]), None)
+    if source is None:
+        raise HTTPException(status_code=400, detail="source capability has no content to transfer")
+    try:
+        parsed = json.loads(source["content"])
+    except json.JSONDecodeError:
+        parsed = {}
+    name = parsed.get("name") if isinstance(parsed, dict) else None
+    if isinstance(name, str) and name.strip():
+        return name.strip()
+    capability_id = capability["capability_id"]
+    for prefix in (_SKILL_CAPABILITY_PREFIX, _AGENT_CAPABILITY_PREFIX, _COMMAND_CAPABILITY_PREFIX):
+        if capability_id.startswith(prefix):
+            return capability_id.removeprefix(prefix)
+    raise HTTPException(status_code=400, detail="could not resolve capability transfer name")
 
 
 def _merged_entries_from_candidates(candidates: list[Candidate]) -> list[dict]:
@@ -2612,6 +2642,88 @@ async def create_capability(req: CreateCapabilityRequest):
 @router.post("/capability")
 async def create_capability_route(req: CreateCapabilityRequest):
     return await create_capability(req)
+
+
+def _transfer_capability_targets(req: TransferCapabilityRequest, source: dict) -> tuple[dict, list[dict]]:
+    if source["category"] not in {"skill", "agent", "command"}:
+        raise HTTPException(status_code=400, detail="move/copy supports skill, agent, and command capabilities")
+    providers = _provider_records()
+    target_project_root = _project_root_for_scope(req.target_scope, req.target_cwd)
+    create_req = CreateCapabilityRequest(
+        cwd=req.target_cwd,
+        scope=req.target_scope,
+        category=source["category"],
+        provider_kinds=[provider["kind"] for provider in providers],
+        name=_common_item_name_from_capability(source),
+    )
+    candidates = [_new_capability_candidate(create_req, provider, target_project_root) for provider in providers]
+    entries = _merged_entries_from_candidates(candidates)
+    first_entry = entries[0]
+    unified = _unified_entry(
+        scope=req.target_scope,
+        category=source["category"],
+        capability_id=first_entry["capability_id"],
+        capability_name=first_entry["capability_name"],
+        language=first_entry["language"],
+        project_root=target_project_root,
+    )
+    return unified, entries
+
+
+async def transfer_capability(req: TransferCapabilityRequest):
+    if req.mode not in {"copy", "move"}:
+        raise HTTPException(status_code=400, detail="mode must be copy or move")
+    if req.scope == req.target_scope and req.cwd == req.target_cwd:
+        raise HTTPException(status_code=400, detail="target must be a different level or project")
+    source = _capability_for_tool(req.cwd, req.capability_id, req.scope)
+    source_entries = [source["unified"], *source["specifics"]]
+    target_unified, target_entries = _transfer_capability_targets(req, source)
+    changed_entries = [target_unified, *target_entries]
+    deleted_paths: list[str] = []
+    with _lock:
+        latest_source = _capability_for_tool(req.cwd, req.capability_id, req.scope)
+        latest_source_entries = [latest_source["unified"], *latest_source["specifics"]]
+        for entry in latest_source_entries:
+            if entry["entry_id"] not in req.expected_contents:
+                raise HTTPException(status_code=400, detail="expected content missing for capability entry")
+            current, exists = _read_entry_current(entry)
+            if _expected_content(current, exists) != req.expected_contents[entry["entry_id"]]:
+                raise HTTPException(status_code=409, detail="file changed; refresh before moving or copying")
+        latest_target_unified, latest_target_entries = _transfer_capability_targets(req, latest_source)
+        for entry in [latest_target_unified, *latest_target_entries]:
+            if entry["exists"]:
+                raise HTTPException(status_code=409, detail="target capability already exists")
+            if not entry["writable"]:
+                raise HTTPException(status_code=400, detail="target capability is not writable")
+        source_by_provider = {
+            entry["provider_kinds"][0]: entry
+            for entry in latest_source_entries
+            if entry["exists"] and entry["provider_kinds"]
+        }
+        unified_source = latest_source["unified"] if latest_source["unified"]["exists"] else None
+        fallback_source = unified_source or next((entry for entry in latest_source["specifics"] if entry["exists"]), None)
+        if fallback_source is None:
+            raise HTTPException(status_code=400, detail="source capability has no content to transfer")
+        _write_entry_if_unchanged(latest_target_unified, None, fallback_source["content"])
+        for target in latest_target_entries:
+            source_entry = source_by_provider.get(target["provider_kinds"][0], fallback_source)
+            _write_entry_if_unchanged(target, None, source_entry["content"])
+        if req.mode == "move":
+            for entry in latest_source_entries:
+                if _delete_entry_if_unchanged(entry, req.expected_contents[entry["entry_id"]]):
+                    deleted_paths.append(entry["path"])
+    for entry in changed_entries:
+        await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.target_cwd)
+    for entry in source_entries:
+        if entry["path"] in deleted_paths:
+            await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    target = _capability_for_tool(req.target_cwd, target_unified["capability_id"], req.target_scope)
+    return {"ok": True, "mode": req.mode, "capability": target, "deleted_paths": deleted_paths}
+
+
+@router.post("/capability/transfer")
+async def transfer_capability_route(req: TransferCapabilityRequest):
+    return await transfer_capability(req)
 
 
 @router.post("/file/restore")

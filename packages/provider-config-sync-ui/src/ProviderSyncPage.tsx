@@ -29,6 +29,7 @@ import type {
   ProviderSyncResponse,
   ProviderSyncRestoreRequest,
   ProviderSyncScope,
+  ProviderSyncTransferCapabilityRequest,
   ProviderSyncWriteRequest,
 } from "@better-agent/provider-config-sync-core";
 import { type ProviderSyncApiClient, type ProviderSyncProject } from "./client.js";
@@ -167,6 +168,10 @@ function shouldConfirmApplyTargetOverwrite(target: ProviderSyncFile): boolean {
   return target.exists && target.content.trim().length > 0;
 }
 
+function canTransferCapability(capability: ProviderSyncCapability): boolean {
+  return capability.category === "skill" || capability.category === "agent" || capability.category === "command";
+}
+
 export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }: ProviderSyncPageProps) {
   const [data, setData] = useState<ProviderSyncResponse | null>(null);
   const [projects, setProjects] = useState<ProviderSyncProject[]>([]);
@@ -174,6 +179,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   const [capabilityMenuOpen, setCapabilityMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [transferCapabilityId, setTransferCapabilityId] = useState("");
+  const [transferMode, setTransferMode] = useState<"copy" | "move">("copy");
+  const [transferTargetScope, setTransferTargetScope] = useState<ProviderSyncScope>("project");
+  const [transferTargetCwd, setTransferTargetCwd] = useState(cwd ?? "");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [newCapabilityCategory, setNewCapabilityCategory] = useState<"skill" | "agent" | "command">("skill");
   const [newCapabilityProviders, setNewCapabilityProviders] = useState<string[]>([]);
@@ -196,6 +205,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     [projects],
   );
   const targetCwd = scope === "project" ? selectedProjectPath : "";
+  const transferTargetEffectiveCwd = transferTargetScope === "project" ? transferTargetCwd : "";
 
   useEffect(() => {
     if (!open) return;
@@ -204,6 +214,9 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
         const local = nextProjects.filter((project) => (project.node_id ?? "primary") === "primary");
         setProjects(nextProjects);
         setSelectedProjectPath(
+          local.some((project) => project.path === cwd) ? cwd ?? "" : local[0]?.path ?? "",
+        );
+        setTransferTargetCwd(
           local.some((project) => project.path === cwd) ? cwd ?? "" : local[0]?.path ?? "",
         );
       })
@@ -320,6 +333,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     setCapabilityMenuOpen(false);
     setAutoLog(null);
     setCreateOpen(false);
+    setTransferCapabilityId("");
   }, [scope, targetCwd]);
 
   useEffect(() => {
@@ -472,6 +486,60 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     fetchSync,
   ]);
 
+  const transferCapability = useCallback(async (capability: ProviderSyncCapability) => {
+    if (!canTransferCapability(capability) || !transferTargetScope) return;
+    if (transferTargetScope === "project" && !transferTargetCwd) return;
+    const sourceLabel = capability.scope === "global" ? "global" : selectedProjectPath;
+    const targetLabel = transferTargetScope === "global" ? "global" : transferTargetCwd;
+    if (sourceLabel === targetLabel) return;
+    const entries = [capability.unified, ...capability.specifics];
+    const dirty = entries.some((entry) => isDirty(entry));
+    if (dirty) {
+      setError("Save or discard edits before moving or copying a capability.");
+      return;
+    }
+    if (transferMode === "move" && !window.confirm(`Move ${capability.name} to ${targetLabel}?`)) return;
+    setBusy(true);
+    try {
+      const expected_contents = Object.fromEntries(
+        entries.map((entry) => [entry.entry_id, entry.exists ? entry.content : null]),
+      );
+      const body: ProviderSyncTransferCapabilityRequest = {
+        cwd: targetCwd,
+        scope: capability.scope,
+        capability_id: capability.capability_id,
+        target_cwd: transferTargetScope === "project" ? transferTargetCwd : "",
+        target_scope: transferTargetScope,
+        mode: transferMode,
+        expected_contents,
+      };
+      const result = await client.transferCapability(body);
+      setTransferCapabilityId("");
+      await fetchSync();
+      if (result.capability?.id && transferTargetScope === scope && transferTargetEffectiveCwd === targetCwd) {
+        setSelectedCapabilityId(result.capability.id);
+      } else if (transferMode === "move") {
+        setSelectedCapabilityId("");
+      }
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [
+    transferTargetScope,
+    transferTargetCwd,
+    selectedProjectPath,
+    transferMode,
+    isDirty,
+    targetCwd,
+    client,
+    fetchSync,
+    scope,
+    transferTargetEffectiveCwd,
+  ]);
+
   const apply = useCallback(async (capability: ProviderSyncCapability, source: ProviderSyncFile, target: ProviderSyncFile) => {
     if (
       shouldConfirmApplyTargetOverwrite(target)
@@ -581,6 +649,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   const selectCapability = (capabilityId: string) => {
     setSelectedCapabilityId(capabilityId);
     setCapabilityMenuOpen(false);
+    setTransferCapabilityId("");
   };
 
   return (
@@ -781,27 +850,99 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                   {!collapsedGroups[group.category] && (
                     <div className="provider-sync-capability-group-items">
                       {group.capabilities.map((capability) => (
-                      <button
-                        key={capability.id}
-                        type="button"
-                        className={capability.id === selectedCapability?.id ? "active" : ""}
-                        onClick={() => selectCapability(capability.id)}
-                      >
-                        <span className="provider-sync-capability-name">
-                          <span
-                            className={`provider-sync-status-dot ${capabilityStatus(capability)}`}
-                            aria-label={`${capabilityStatus(capability)} capability`}
-                          />
-                          <span>{capability.name}</span>
-                        </span>
-                        <small>
-                          {capability.specific_count} specifics
-                          {capability.has_diffs ? " · diff" : " · aligned"}
-                          {capability.missing_count ? ` · ${capability.missing_count} missing` : ""}
-                          {` · ${formatTokens(capability.total_token_count)} est.`}
-                        </small>
-                      </button>
-                    ))}
+                        <div className="provider-sync-capability-item" key={capability.id}>
+                          <button
+                            type="button"
+                            className={capability.id === selectedCapability?.id ? "active" : ""}
+                            onClick={() => selectCapability(capability.id)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              selectCapability(capability.id);
+                              if (canTransferCapability(capability)) {
+                                setTransferCapabilityId((current) => current === capability.id ? "" : capability.id);
+                                setTransferTargetScope(capability.scope === "global" ? "project" : "global");
+                              }
+                            }}
+                          >
+                            <span className="provider-sync-capability-name">
+                              <span
+                                className={`provider-sync-status-dot ${capabilityStatus(capability)}`}
+                                aria-label={`${capabilityStatus(capability)} capability`}
+                              />
+                              <span>{capability.name}</span>
+                            </span>
+                            <small>
+                              {capability.specific_count} specifics
+                              {capability.has_diffs ? " · diff" : " · aligned"}
+                              {capability.missing_count ? ` · ${capability.missing_count} missing` : ""}
+                              {` · ${formatTokens(capability.total_token_count)} est.`}
+                            </small>
+                          </button>
+                          {transferCapabilityId === capability.id && (
+                            <div className="provider-sync-transfer-panel">
+                              {canTransferCapability(capability) ? (
+                                <>
+                                  <div className="provider-sync-segmented">
+                                    <button
+                                      type="button"
+                                      className={transferMode === "copy" ? "active" : ""}
+                                      onClick={() => setTransferMode("copy")}
+                                    >
+                                      Copy
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={transferMode === "move" ? "active" : ""}
+                                      onClick={() => setTransferMode("move")}
+                                    >
+                                      Move
+                                    </button>
+                                  </div>
+                                  <select
+                                    aria-label="Transfer target level"
+                                    className="provider-sync-select"
+                                    value={transferTargetScope}
+                                    onChange={(e) => setTransferTargetScope(e.target.value as ProviderSyncScope)}
+                                  >
+                                    {SCOPES.map((item) => (
+                                      <option key={item} value={item}>{item}</option>
+                                    ))}
+                                  </select>
+                                  {transferTargetScope === "project" && (
+                                    <select
+                                      aria-label="Transfer target project"
+                                      className="provider-sync-select"
+                                      value={transferTargetCwd}
+                                      onChange={(e) => setTransferTargetCwd(e.target.value)}
+                                    >
+                                      <option value="">select project</option>
+                                      {projectOptions.map((project) => (
+                                        <option key={`${project.node_id ?? "primary"}:${project.path}`} value={project.path}>
+                                          {project.name} · {project.path}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn-primary"
+                                    disabled={
+                                      busy
+                                      || (transferTargetScope === "project" && !transferTargetCwd)
+                                      || (capability.scope === transferTargetScope && targetCwd === transferTargetEffectiveCwd)
+                                    }
+                                    onClick={() => void transferCapability(capability)}
+                                  >
+                                    {transferMode === "copy" ? "Copy capability" : "Move capability"}
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="provider-sync-empty">Move/copy supports skills, subagents, and commands.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </section>

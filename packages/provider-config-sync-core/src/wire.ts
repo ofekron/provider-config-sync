@@ -101,6 +101,16 @@ export interface ProviderSyncCreateCapabilityRequest {
   metadata: Record<string, unknown>;
 }
 
+export interface ProviderSyncTransferCapabilityRequest {
+  cwd: string;
+  scope: ProviderSyncScope;
+  capability_id: string;
+  target_cwd: string;
+  target_scope: ProviderSyncScope;
+  mode: "copy" | "move";
+  expected_contents: Record<string, string | null>;
+}
+
 export interface ProviderSyncApplyRequest {
   cwd: string;
   capability_id: string;
