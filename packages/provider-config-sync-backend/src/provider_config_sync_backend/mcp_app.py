@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-GOOSE_APP_URI = "ui://provider-config-sync/main"
-GOOSE_APP_MIME_TYPE = "text/html;profile=mcp-app"
+MCP_APP_URI = "ui://provider-config-sync/main"
+MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 
 
-def goose_app_html() -> str:
+def mcp_app_html() -> str:
     return r"""<!doctype html>
 <html lang="en">
 <head>

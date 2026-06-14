@@ -53,14 +53,56 @@ export interface ProviderSyncApiClient {
 export interface FetchProviderSyncClientOptions {
   baseUrl: string;
   credentials?: RequestCredentials;
+  routes?: ProviderSyncFetchRoutes;
 }
 
-// Default client reproducing the original better-claude behavior: cookie auth,
-// JSON bodies, errors surfaced as `detail` (or `HTTP {status}`).
+export interface ProviderSyncFetchRoutes {
+  projects: string;
+  state: string;
+  settings: string;
+  file: string;
+  restoreFile: string;
+  capability: string;
+  transferCapability: string;
+  apply: string;
+  autoSync: string;
+}
+
+export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderSyncFetchRoutes = {
+  projects: "/api/provider-config-sync/projects",
+  state: "/api/provider-config-sync",
+  settings: "/api/provider-config-sync/settings",
+  file: "/api/provider-config-sync/file",
+  restoreFile: "/api/provider-config-sync/file/restore",
+  capability: "/api/provider-config-sync/capability",
+  transferCapability: "/api/provider-config-sync/capability/transfer",
+  apply: "/api/provider-config-sync/apply",
+  autoSync: "/api/provider-config-sync/auto-sync",
+};
+
+export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES: ProviderSyncFetchRoutes = {
+  projects: "/api/projects",
+  state: "/api/provider-sync",
+  settings: "/api/provider-sync/settings",
+  file: "/api/provider-sync/file",
+  restoreFile: "/api/provider-sync/file/restore",
+  capability: "/api/provider-sync/capability",
+  transferCapability: "/api/provider-sync/capability/transfer",
+  apply: "/api/provider-sync/apply",
+  autoSync: "/api/provider-sync/auto-sync",
+};
+
+function pathWithParams(path: string, params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+// Generic fetch client for the standalone provider-config-sync backend. Hosts
+// with different route ownership inject a route map or their own client.
 export function createFetchProviderSyncClient(
   options: FetchProviderSyncClientOptions,
 ): ProviderSyncApiClient {
-  const { baseUrl, credentials = "include" } = options;
+  const { baseUrl, credentials = "include", routes = PROVIDER_CONFIG_SYNC_ROUTES } = options;
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${baseUrl}${path}`, {
@@ -80,39 +122,48 @@ export function createFetchProviderSyncClient(
 
   return {
     listProjects: () =>
-      request<{ projects?: ProviderSyncProject[] }>("/api/projects").then((b) => b.projects ?? []),
+      request<{ projects?: ProviderSyncProject[] }>(routes.projects).then((b) => b.projects ?? []),
     getState: (cwd) => {
       const params = new URLSearchParams();
       if (cwd) params.set("cwd", cwd);
-      return request<ProviderSyncResponse>(`/api/provider-sync?${params.toString()}`);
+      return request<ProviderSyncResponse>(pathWithParams(routes.state, params));
     },
     updateAutoSettings: (body) =>
-      request<ProviderSyncAutoSettings>("/api/provider-sync/settings", {
+      request<ProviderSyncAutoSettings>(routes.settings, {
         method: "PATCH",
         body: json(body),
       }),
     writeFile: (body) =>
-      request<void>("/api/provider-sync/file", { method: "PUT", body: json(body) }),
+      request<void>(routes.file, { method: "PUT", body: json(body) }),
     restoreFile: (body) =>
-      request<void>("/api/provider-sync/file/restore", { method: "POST", body: json(body) }),
+      request<void>(routes.restoreFile, { method: "POST", body: json(body) }),
     deleteCapability: (body) =>
-      request<void>("/api/provider-sync/capability", { method: "DELETE", body: json(body) }),
+      request<void>(routes.capability, { method: "DELETE", body: json(body) }),
     createCapability: (body) =>
-      request<ProviderSyncCreateCapabilityResponse>("/api/provider-sync/capability", {
+      request<ProviderSyncCreateCapabilityResponse>(routes.capability, {
         method: "POST",
         body: json(body),
       }),
     transferCapability: (body) =>
-      request<ProviderSyncCreateCapabilityResponse>("/api/provider-sync/capability/transfer", {
+      request<ProviderSyncCreateCapabilityResponse>(routes.transferCapability, {
         method: "POST",
         body: json(body),
       }),
     apply: (body) =>
-      request<void>("/api/provider-sync/apply", { method: "POST", body: json(body) }),
+      request<void>(routes.apply, { method: "POST", body: json(body) }),
     autoSync: (body) =>
-      request<ProviderSyncAutoResponse>("/api/provider-sync/auto-sync", {
+      request<ProviderSyncAutoResponse>(routes.autoSync, {
         method: "POST",
         body: json(body),
       }),
   };
+}
+
+export function createBetterClaudeProviderSyncClient(
+  options: Omit<FetchProviderSyncClientOptions, "routes">,
+): ProviderSyncApiClient {
+  return createFetchProviderSyncClient({
+    ...options,
+    routes: BETTER_CLAUDE_PROVIDER_SYNC_ROUTES,
+  });
 }

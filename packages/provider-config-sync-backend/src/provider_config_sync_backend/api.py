@@ -2365,6 +2365,24 @@ async def get_provider_sync(cwd: str = Query("", description="Project cwd for pr
     return _discover(cwd)
 
 
+@router.get("/projects")
+async def list_provider_sync_projects():
+    projects = []
+    for project in _project_records_source():
+        path = project.get("path")
+        if not isinstance(path, str) or not path:
+            continue
+        projects.append(
+            {
+                **project,
+                "path": str(_expand_path(path).resolve()),
+                "name": project.get("name") or Path(path).name or path,
+                "node_id": project.get("node_id") or "primary",
+            }
+        )
+    return {"projects": projects}
+
+
 class WriteNativeFileRequest(BaseModel):
     cwd: str = ""
     entry_id: str | None = None

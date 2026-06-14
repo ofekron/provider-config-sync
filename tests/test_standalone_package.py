@@ -19,6 +19,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve()
 _ROOT = _HERE.parents[1]
 _PACKAGE_SRC = _ROOT / "packages" / "provider-config-sync-backend" / "src"
+_UI_CLIENT = _ROOT / "packages" / "provider-config-sync-ui" / "src" / "client.ts"
 _UI_STYLES = _ROOT / "packages" / "provider-config-sync-ui" / "src" / "styles.css"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
@@ -133,8 +134,26 @@ def t_standalone_app_loads_json_config() -> None:
         app = create_app(config_path)
         paths = {route.path for route in app.routes}
         check("/api/provider-config-sync" in paths, "standalone FastAPI app mounts provider-config-sync route")
+        check("/api/provider-config-sync/projects" in paths, "standalone FastAPI app exposes project picker route")
     finally:
         shutil.rmtree(wipe)
+
+
+def t_ui_client_keeps_better_claude_routes_explicit() -> None:
+    client = _UI_CLIENT.read_text(encoding="utf-8")
+    generic_routes = client.split("export const PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
+        "export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES",
+        1,
+    )[0]
+    better_claude_routes = client.split("export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES", 1)[1].split(
+        "function pathWithParams",
+        1,
+    )[0]
+    check("/api/provider-sync" not in generic_routes, "generic UI client does not depend on Better Claude provider-sync routes")
+    check("/api/projects" not in generic_routes, "generic UI client does not depend on Better Claude project route")
+    check("/api/provider-config-sync" in generic_routes, "generic UI client targets standalone package API")
+    check("/api/provider-sync" in better_claude_routes, "Better Claude route map is explicit")
+    check("createBetterClaudeProviderSyncClient" in client, "Better Claude adapter has a named factory")
 
 
 def t_diff_line_editors_hide_textarea_chrome() -> None:
@@ -226,25 +245,25 @@ def t_mcp_server_exposes_sync_tools() -> None:
     gui_tool = next(tool for tool in tools if tool.name == "open_provider_config_sync_gui")
     check(
         gui_tool.meta["ui"]["resourceUri"] == "ui://provider-config-sync/main",
-        "Goose GUI tool declares MCP App resource metadata",
+        "MCP App tool declares MCP App resource metadata",
     )
     resources = asyncio.run(server.list_resources())
     resource = next(item for item in resources if str(item.uri) == "ui://provider-config-sync/main")
-    check(resource.mimeType == "text/html;profile=mcp-app", "Goose GUI resource uses MCP App HTML mime type")
+    check(resource.mimeType == "text/html;profile=mcp-app", "MCP App resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
-    check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
-    check("create_provider_config_capability" in content.content, "Goose GUI can create capabilities")
-    check('id="createCapability"' in content.content, "Goose GUI exposes add capability controls")
-    check("collapsedGroups" in content.content and "cap-group-head" in content.content, "Goose GUI can collapse capability groups")
-    check("auto_sync_provider_config_entry" in content.content, "Goose GUI can auto-merge with configured AI review")
-    check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "Goose GUI always labels unified and specific diff panes")
-    check("Unified is missing" in content.content and "Specific is missing" in content.content, "Goose GUI keeps empty diff panes visible")
-    check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
-    check('"reset").onclick = () => { $("content").value = state.original;' in content.content, "Goose GUI reset restores apply buttons")
-    check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "Goose GUI has mobile layout rules")
-    check('window.addEventListener("resize", () => app.resize())' in content.content, "Goose GUI notifies host after viewport changes")
+    check("tools/call" in content.content, "MCP App can call provider config sync tools")
+    check("create_provider_config_capability" in content.content, "MCP App can create capabilities")
+    check('id="createCapability"' in content.content, "MCP App exposes add capability controls")
+    check("collapsedGroups" in content.content and "cap-group-head" in content.content, "MCP App can collapse capability groups")
+    check("auto_sync_provider_config_entry" in content.content, "MCP App can auto-merge with configured AI review")
+    check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "MCP App always labels unified and specific diff panes")
+    check("Unified is missing" in content.content and "Specific is missing" in content.content, "MCP App keeps empty diff panes visible")
+    check("Save source before applying" in content.content, "MCP App blocks apply while source edits are unsaved")
+    check('"reset").onclick = () => { $("content").value = state.original;' in content.content, "MCP App reset restores apply buttons")
+    check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "MCP App has mobile layout rules")
+    check('window.addEventListener("resize", () => app.resize())' in content.content, "MCP App notifies host after viewport changes")
     result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))
-    check(result.structuredContent["cwd"] == "/repo", "Goose GUI tool returns requested project path")
+    check(result.structuredContent["cwd"] == "/repo", "MCP App tool returns requested project path")
 
 
 def t_agent_integrations_install_native_commands() -> None:
@@ -846,6 +865,7 @@ def t_auto_sync_settings_resolve_hierarchy() -> None:
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
+    t_ui_client_keeps_better_claude_routes_explicit()
     t_diff_line_editors_hide_textarea_chrome()
     t_diff_views_use_natural_height_without_internal_scrolling()
     t_file_actions_live_in_diff_header()

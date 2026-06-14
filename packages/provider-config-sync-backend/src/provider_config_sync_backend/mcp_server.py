@@ -8,7 +8,7 @@ from mcp.types import CallToolResult, TextContent
 
 from . import api
 from .automation import _capability_worklist, _config_path, _projects
-from .goose_app import GOOSE_APP_MIME_TYPE, GOOSE_APP_URI, goose_app_html
+from .mcp_app import MCP_APP_MIME_TYPE, MCP_APP_URI, mcp_app_html
 from .standalone import configure_from_file
 
 
@@ -28,11 +28,11 @@ def create_server() -> FastMCP:
     )
 
     @server.resource(
-        GOOSE_APP_URI,
+        MCP_APP_URI,
         name="Provider Config Sync",
         title="Provider Config Sync",
-        description="Interactive Goose MCP App for syncing provider-native agent config capabilities.",
-        mime_type=GOOSE_APP_MIME_TYPE,
+        description="Interactive MCP App for syncing provider-native agent config capabilities.",
+        mime_type=MCP_APP_MIME_TYPE,
         meta={
             "ui": {
                 "csp": {
@@ -45,13 +45,13 @@ def create_server() -> FastMCP:
             }
         },
     )
-    def provider_config_sync_goose_app() -> str:
-        return goose_app_html()
+    def provider_config_sync_mcp_app() -> str:
+        return mcp_app_html()
 
     @server.tool(
         meta={
             "ui": {
-                "resourceUri": GOOSE_APP_URI,
+                "resourceUri": MCP_APP_URI,
                 "visibility": ["model", "app"],
             }
         }
@@ -68,7 +68,7 @@ def create_server() -> FastMCP:
                 )
             ],
             structuredContent={"cwd": cwd},
-            meta={"ui": {"resourceUri": GOOSE_APP_URI}},
+            meta={"ui": {"resourceUri": MCP_APP_URI}},
         )
 
     @server.tool()

@@ -5,12 +5,14 @@ description: Use for provider-config-sync project structure, backend API/MCP UI 
 
 # Provider Config Sync Structure
 
-Provider Config Sync is a small monorepo with a TypeScript core package and a Python backend that exposes discovery, sync, auto-sync, MCP tools, and an embedded HTML UI for comparing unified provider configuration with provider-specific files.
+Provider Config Sync is a small monorepo with TypeScript core/UI packages and a Python backend that exposes discovery, sync, auto-sync, MCP tools, and a compact MCP App for comparing unified provider configuration with provider-specific files.
 
 ## Routing
 
 - Core diff/item logic: `packages/provider-config-sync-core/src/`
-- Backend API, discovery, sync, auto-sync, embedded UI: `packages/provider-config-sync-backend/src/provider_config_sync_backend/api.py`
+- Reusable React UI: `packages/provider-config-sync-ui/src/`
+- Backend API, discovery, sync, auto-sync: `packages/provider-config-sync-backend/src/provider_config_sync_backend/api.py`
+- Compact MCP App HTML: `packages/provider-config-sync-backend/src/provider_config_sync_backend/mcp_app.py`
 - MCP server wiring: `packages/provider-config-sync-backend/src/provider_config_sync_backend/mcp_server.py`
 - Standalone app entry: `packages/provider-config-sync-backend/src/provider_config_sync_backend/standalone.py`
 - Automation integrations: `packages/provider-config-sync-backend/src/provider_config_sync_backend/automation.py`
@@ -20,6 +22,7 @@ Provider Config Sync is a small monorepo with a TypeScript core package and a Py
 ## Commands
 
 - Build TypeScript core: `npm run build:core`
+- Build TypeScript UI: `npm run build:ui`
 - Run Python regression tests: `python tests/test_standalone_package.py`
 
 ## Keeping This Skill Current
