@@ -775,8 +775,9 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                     <span>{group.label}</span>
                     <small>{group.capabilities.length}</small>
                   </button>
-                  <div className="provider-sync-capability-group-items" hidden={collapsedGroups[group.category]}>
-                    {group.capabilities.map((capability) => (
+                  {!collapsedGroups[group.category] && (
+                    <div className="provider-sync-capability-group-items">
+                      {group.capabilities.map((capability) => (
                       <button
                         key={capability.id}
                         type="button"
@@ -798,7 +799,8 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                         </small>
                       </button>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </section>
               ))}
               {capabilities.length === 0 && (
