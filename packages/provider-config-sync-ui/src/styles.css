@@ -845,7 +845,7 @@
   min-width: 0;
   width: 100%;
   min-height: 32px;
-  resize: vertical;
+  resize: none;
   border: 0;
   border-radius: 0;
   padding: 2px 8px;
@@ -1548,7 +1548,6 @@
 
   .provider-sync-aligned-diff-cell-editor {
     min-height: 28px;
-    resize: none;
   }
 
   .provider-sync-diff-arrow-button {
