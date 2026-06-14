@@ -1322,7 +1322,6 @@ function EditableDiffCell({
   fallbackIndex,
   text,
   cellClassName,
-  changeLabel,
   writable,
   onChange,
 }: {
@@ -1331,14 +1330,12 @@ function EditableDiffCell({
   fallbackIndex: number;
   text: string;
   cellClassName: string;
-  changeLabel: string | null;
   writable: boolean;
   onChange: (lineNumber: number | null, fallbackIndex: number, content: string) => void;
 }) {
   const rows = Math.max(1, text.split(/\r?\n/).length);
   return (
     <div className={cellClassName}>
-      {changeLabel && <span className="provider-sync-diff-cell-marker">{changeLabel}</span>}
       <textarea
         aria-label={`${label} line ${lineNumber ?? fallbackIndex + 1}`}
         className="provider-sync-aligned-diff-cell-editor"
@@ -1362,10 +1359,6 @@ function diffCellTone(row: AlignedDiffRow, side: "left" | "right"): "same" | "ch
 function diffCellClassName(row: AlignedDiffRow, side: "left" | "right"): string {
   const tone = diffCellTone(row, side);
   return `provider-sync-diff-cell provider-sync-diff-cell-${side} ${tone}`;
-}
-
-function diffCellChangeLabel(row: AlignedDiffRow, side: "left" | "right", label: string): string | null {
-  return diffCellTone(row, side) === "changed" ? label : null;
 }
 
 function diffCounts(rows: AlignedDiffRow[]) {
@@ -1626,15 +1619,11 @@ function AlignedDiffView({
                     fallbackIndex={index}
                     text={row.unifiedText}
                     cellClassName={diffCellClassName(row, "left")}
-                    changeLabel={diffCellChangeLabel(row, "left", leftLabel)}
                     writable={editable.leftWritable}
                     onChange={editable.onChangeLeft}
                   />
                 ) : (
                   <div className={diffCellClassName(row, "left")}>
-                    {diffCellChangeLabel(row, "left", leftLabel) && (
-                      <span className="provider-sync-diff-cell-marker">{leftLabel}</span>
-                    )}
                     <pre>{row.unifiedText}</pre>
                   </div>
                 )}
@@ -1664,15 +1653,11 @@ function AlignedDiffView({
                     fallbackIndex={index}
                     text={row.specificText}
                     cellClassName={diffCellClassName(row, "right")}
-                    changeLabel={diffCellChangeLabel(row, "right", rightLabel)}
                     writable={editable.rightWritable}
                     onChange={editable.onChangeRight}
                   />
                 ) : (
                   <div className={diffCellClassName(row, "right")}>
-                    {diffCellChangeLabel(row, "right", rightLabel) && (
-                      <span className="provider-sync-diff-cell-marker">{rightLabel}</span>
-                    )}
                     <pre>{row.specificText}</pre>
                   </div>
                 )}
