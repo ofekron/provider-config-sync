@@ -82,6 +82,15 @@ def goose_app_html() -> str:
     }
     button.primary { background: var(--accent); border-color: var(--accent); color: white; }
     button:disabled { cursor: not-allowed; opacity: .5; }
+    button.icon {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      font-size: 16px;
+      line-height: 1;
+    }
     .main {
       display: grid;
       grid-template-columns: 310px minmax(0, 1fr);
@@ -148,8 +157,50 @@ def goose_app_html() -> str:
     .entry.active { border-color: var(--accent); }
     .entry.missing { opacity: .75; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
     .status { min-height: 20px; color: var(--muted); }
     .error { color: var(--bad); }
+    .compare { margin-top: 12px; display: grid; gap: 12px; }
+    .compare-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+    .compare-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .diff-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      min-width: 720px;
+      overflow: hidden;
+    }
+    .diff-side { min-width: 0; border-right: 1px solid var(--line); }
+    .diff-side:last-child { border-right: 0; }
+    .diff-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .diff-line {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      min-height: 22px;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 45%);
+    }
+    .diff-line:last-child { border-bottom: 0; }
+    .ln { padding: 2px 8px; color: var(--muted); text-align: right; user-select: none; }
+    .code { padding: 2px 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .same .code { color: var(--muted); }
+    .add .code { background: color-mix(in srgb, var(--good), transparent 82%); }
+    .remove .code { background: color-mix(in srgb, var(--bad), transparent 84%); }
     @media (max-width: 760px) {
       body { overflow: auto; }
       .shell {
@@ -215,6 +266,10 @@ def goose_app_html() -> str:
         grid-template-columns: 1fr 1fr;
       }
       .row button { width: 100%; }
+      .toolbar { justify-content: flex-start; }
+      .toolbar button { width: 34px; }
+      .compare-head { grid-template-columns: 1fr; }
+      .compare { overflow-x: auto; }
     }
     @media (max-width: 420px) {
       h1 { font-size: 15px; }
@@ -262,7 +317,7 @@ def goose_app_html() -> str:
               <textarea id="content" spellcheck="false"></textarea>
               <div class="row">
                 <button class="primary" id="save">Save file</button>
-                <button id="reset">Reset edits</button>
+                <button class="icon" id="reset" title="Reset edits" aria-label="Reset edits">↩</button>
               </div>
               <div class="status" id="status"></div>
             </div>
@@ -277,6 +332,7 @@ def goose_app_html() -> str:
             </div>
           </section>
         </div>
+        <section class="compare" id="compare"></section>
       </main>
     </div>
   </div>
@@ -344,7 +400,7 @@ def goose_app_html() -> str:
     }
 
     const app = new McpApp();
-    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "" };
+    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "", entryContents: new Map() };
     const $ = id => document.getElementById(id);
 
     function setStatus(message, isError) {
@@ -360,6 +416,111 @@ def goose_app_html() -> str:
     function entryTitle(entry) {
       const providers = (entry.provider_names || []).join(", ");
       return (providers || entry.role) + " - " + entry.label;
+    }
+
+    function iconButton(symbol, label, onClick, disabled) {
+      const button = document.createElement("button");
+      button.className = "icon";
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.textContent = symbol;
+      button.disabled = !!disabled;
+      button.onclick = onClick;
+      return button;
+    }
+
+    async function readEntry(entry) {
+      if (state.entryContents.has(entry.entry_id)) return state.entryContents.get(entry.entry_id);
+      if (!entry.exists) {
+        state.entryContents.set(entry.entry_id, "");
+        return "";
+      }
+      const full = await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: entry.entry_id });
+      state.entryContents.set(entry.entry_id, full.content || "");
+      if (state.entry && state.entry.entry_id === full.entry_id) state.entry = full;
+      return full.content || "";
+    }
+
+    function splitLines(content) {
+      if (!content) return [];
+      const lines = content.split("\n");
+      if (lines.length && lines[lines.length - 1] === "") lines.pop();
+      return lines;
+    }
+
+    function diffRows(unifiedContent, specificContent) {
+      const unified = splitLines(unifiedContent);
+      const specific = splitLines(specificContent);
+      const dp = Array.from({ length: unified.length + 1 }, () => Array(specific.length + 1).fill(0));
+      for (let i = unified.length - 1; i >= 0; i -= 1) {
+        for (let j = specific.length - 1; j >= 0; j -= 1) {
+          dp[i][j] = unified[i] === specific[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+      }
+      const rows = [];
+      let i = 0;
+      let j = 0;
+      while (i < unified.length || j < specific.length) {
+        if (i < unified.length && j < specific.length && unified[i] === specific[j]) {
+          rows.push({ kind: "same", unifiedLine: i + 1, specificLine: j + 1, unifiedText: unified[i], specificText: specific[j] });
+          i += 1;
+          j += 1;
+        } else if (j >= specific.length || (i < unified.length && dp[i + 1][j] >= dp[i][j + 1])) {
+          rows.push({ kind: "remove", unifiedLine: i + 1, specificLine: "", unifiedText: unified[i], specificText: "" });
+          i += 1;
+        } else {
+          rows.push({ kind: "add", unifiedLine: "", specificLine: j + 1, unifiedText: "", specificText: specific[j] });
+          j += 1;
+        }
+      }
+      return rows.length ? rows : [{ kind: "same", unifiedLine: "", specificLine: "", unifiedText: "", specificText: "" }];
+    }
+
+    function renderDiffSide(rows, side) {
+      const fragment = document.createDocumentFragment();
+      for (const row of rows) {
+        const line = document.createElement("div");
+        const text = side === "unified" ? row.unifiedText : row.specificText;
+        const lineNumber = side === "unified" ? row.unifiedLine : row.specificLine;
+        line.className = "diff-line " + (text ? row.kind : row.kind === "same" ? "same" : "remove");
+        line.innerHTML = "<span class='ln'></span><span class='code'></span>";
+        line.children[0].textContent = lineNumber;
+        line.children[1].textContent = text;
+        fragment.appendChild(line);
+      }
+      return fragment;
+    }
+
+    async function renderCompare() {
+      const container = $("compare");
+      container.innerHTML = "";
+      if (!state.capability) return;
+      const unified = state.capability.unified;
+      const specifics = state.capability.specifics || [];
+      const unifiedContent = await readEntry(unified);
+      for (const specific of specifics) {
+        const specificContent = await readEntry(specific);
+        const rows = diffRows(unifiedContent, specificContent);
+        const card = document.createElement("article");
+        card.className = "compare-card";
+        card.innerHTML =
+          "<div class='compare-head'><div><strong></strong><div class='meta'></div></div><div class='toolbar'></div></div>" +
+          "<div class='diff-grid'><div class='diff-side'><div class='diff-title'><span>Unified</span><span></span></div></div>" +
+          "<div class='diff-side'><div class='diff-title'><span>Specific</span><span></span></div></div></div>";
+        card.querySelector("strong").textContent = entryTitle(specific);
+        card.querySelector(".meta").textContent = specific.path;
+        const toolbar = card.querySelector(".toolbar");
+        const dirty = state.entry && $("content").value !== state.original;
+        toolbar.appendChild(iconButton("→", "Apply unified to specific", () => applyPair(unified, specific), dirty || !specific.writable || !unified.exists));
+        toolbar.appendChild(iconButton("←", "Apply specific to unified", () => applyPair(specific, unified), dirty || !unified.writable || !specific.exists));
+        toolbar.appendChild(iconButton("✦", "AI auto-merge into specific", () => aiMergePair(unified, specific), dirty || !specific.writable || !unified.exists));
+        card.querySelectorAll(".diff-title span")[1].textContent = tokens(unified.token_count) + " tokens";
+        card.querySelectorAll(".diff-title span")[3].textContent = specific.exists ? tokens(specific.token_count) + " tokens" : "empty";
+        card.querySelectorAll(".diff-side")[0].appendChild(renderDiffSide(rows, "unified"));
+        card.querySelectorAll(".diff-side")[1].appendChild(renderDiffSide(rows, "specific"));
+        container.appendChild(card);
+      }
+      app.resize();
     }
 
     function renderList() {
@@ -389,6 +550,7 @@ def goose_app_html() -> str:
       $("selectedName").textContent = capability.name;
       $("selectedMeta").textContent = capability.scope + " / " + capability.category + " / " + tokens(capability.total_token_count) + " tokens";
       state.entries = [capability.unified].concat(capability.specifics || []);
+      state.entryContents = new Map();
       for (const entry of state.entries) {
         const option = document.createElement("option");
         option.value = entry.entry_id;
@@ -396,6 +558,7 @@ def goose_app_html() -> str:
         $("entrySelect").appendChild(option);
       }
       selectEntry(state.entry && state.entry.entry_id || state.entries[0].entry_id);
+      renderCompare().catch(error => setStatus(error.message, true));
     }
 
     function renderTargets() {
@@ -406,16 +569,19 @@ def goose_app_html() -> str:
       if (!source || !state.capability) return;
       for (const target of state.entries) {
         if (target.entry_id === source.entry_id) continue;
-        const button = document.createElement("button");
-        button.className = "entry" + (target.exists ? "" : " missing");
-        button.innerHTML = "<strong></strong><span class='meta'></span><span class='meta'></span>";
-        button.children[0].textContent = "Apply to " + entryTitle(target);
-        button.children[1].textContent = target.path;
-        button.children[2].textContent = dirty ? "Save source before applying" : target.exists ? tokens(target.token_count) + " tokens" : "new file";
-        button.disabled = dirty || !target.writable || !source.exists;
-        button.onclick = () => applyTo(target);
-        $("targets").appendChild(button);
+        const item = document.createElement("div");
+        item.className = "entry" + (target.exists ? "" : " missing");
+        item.innerHTML = "<strong></strong><span class='meta'></span><span class='meta'></span><div class='toolbar'></div>";
+        item.children[0].textContent = entryTitle(target);
+        item.children[1].textContent = target.path;
+        item.children[2].textContent = dirty ? "Save source before applying" : target.exists ? tokens(target.token_count) + " tokens" : "new file";
+        item.querySelector(".toolbar").appendChild(iconButton("→", "Apply selected file to target", () => applyPair(source, target), dirty || !target.writable || !source.exists));
+        if (source.role !== "unified" && target.role === "unified") {
+          item.querySelector(".toolbar").appendChild(iconButton("✦", "AI auto-merge selected file into unified", () => aiMergePair(source, target), dirty || !target.writable || !source.exists));
+        }
+        $("targets").appendChild(item);
       }
+      renderCompare().catch(error => setStatus(error.message, true));
       app.resize();
     }
 
@@ -424,6 +590,7 @@ def goose_app_html() -> str:
       setStatus("Loading...", false);
       try {
         state.payload = await app.callTool("list_provider_config_capabilities", { cwd: state.cwd });
+        state.entryContents = new Map();
         const totals = state.payload.token_totals || {};
         $("unifiedTokens").textContent = tokens(totals.unified);
         $("specificTokens").textContent = tokens(totals.specifics);
@@ -453,6 +620,7 @@ def goose_app_html() -> str:
       try {
         state.entry = await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: entryId });
         state.original = state.entry.content || "";
+        state.entryContents.set(entryId, state.original);
         $("content").value = state.original;
         renderTargets();
         setStatus("", false);
@@ -482,20 +650,19 @@ def goose_app_html() -> str:
       }
     }
 
-    async function applyTo(target) {
-      if (!state.capability || !state.entry) return;
+    async function applyPair(source, target) {
+      if (!state.capability || !source || !target) return;
       setStatus("Applying...", false);
       try {
-        const targetFull = target.exists
-          ? await app.callTool("read_provider_config_entry", { cwd: state.cwd, entry_id: target.entry_id })
-          : null;
+        const sourceContent = state.entry && source.entry_id === state.entry.entry_id ? $("content").value : await readEntry(source);
+        const targetContent = target.exists ? await readEntry(target) : null;
         await app.callTool("apply_provider_config_entry", {
           cwd: state.cwd,
           capability_id: state.capability.capability_id,
-          source_entry_id: state.entry.entry_id,
+          source_entry_id: source.entry_id,
           target_entry_id: target.entry_id,
-          expected_source: $("content").value,
-          expected_target: targetFull ? targetFull.content : null
+          expected_source: sourceContent,
+          expected_target: targetContent
         });
         await load();
         setStatus("Applied.", false);
@@ -504,10 +671,32 @@ def goose_app_html() -> str:
       }
     }
 
+    async function aiMergePair(source, target) {
+      if (!state.capability || !source || !target) return;
+      setStatus("AI merging...", false);
+      try {
+        const sourceContent = state.entry && source.entry_id === state.entry.entry_id ? $("content").value : await readEntry(source);
+        const targetContent = target.exists ? await readEntry(target) : null;
+        const result = await app.callTool("auto_sync_provider_config_entry", {
+          cwd: state.cwd,
+          capability_id: state.capability.capability_id,
+          source_entry_id: source.entry_id,
+          target_entry_id: target.entry_id,
+          expected_source: sourceContent,
+          expected_target: targetContent,
+          policy: { additive: "llm", removal: "llm", change: "llm" }
+        });
+        await load();
+        setStatus("AI merged " + result.applied_count + " hunks; " + result.pending_count + " pending.", false);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
     $("load").onclick = load;
     $("reload").onclick = load;
     $("save").onclick = save;
-    $("reset").onclick = () => { $("content").value = state.original; renderTargets(); };
+    $("reset").onclick = () => { $("content").value = state.original; if (state.entry) state.entryContents.set(state.entry.entry_id, state.original); renderTargets(); };
     $("content").oninput = renderTargets;
     $("entrySelect").onchange = event => selectEntry(event.target.value);
     window.addEventListener("resize", () => app.resize());

@@ -147,6 +147,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
             "read_provider_config_entry",
             "write_provider_config_entry",
             "apply_provider_config_entry",
+            "auto_sync_provider_config_entry",
             "upsert_unified_capability_item",
             "remove_unified_capability_item",
         }.issubset(names),
@@ -162,8 +163,10 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check(resource.mimeType == "text/html;profile=mcp-app", "Goose GUI resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
     check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
+    check("auto_sync_provider_config_entry" in content.content, "Goose GUI can auto-merge with configured AI review")
+    check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "Goose GUI always labels unified and specific diff panes")
     check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
-    check('"reset").onclick = () => { $("content").value = state.original; renderTargets(); }' in content.content, "Goose GUI reset restores apply buttons")
+    check('"reset").onclick = () => { $("content").value = state.original;' in content.content, "Goose GUI reset restores apply buttons")
     check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "Goose GUI has mobile layout rules")
     check('window.addEventListener("resize", () => app.resize())' in content.content, "Goose GUI notifies host after viewport changes")
     result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))

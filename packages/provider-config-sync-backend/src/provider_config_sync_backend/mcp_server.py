@@ -165,6 +165,33 @@ def create_server() -> FastMCP:
             raise _error(error) from error
 
     @server.tool()
+    async def auto_sync_provider_config_entry(
+        capability_id: str,
+        source_entry_id: str,
+        target_entry_id: str,
+        expected_source: str,
+        expected_target: str | None,
+        policy: dict[str, str],
+        cwd: str = "",
+        approved_hunk_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return await api.auto_sync(
+                api.AutoSyncRequest(
+                    cwd=cwd,
+                    capability_id=capability_id,
+                    source_entry_id=source_entry_id,
+                    target_entry_id=target_entry_id,
+                    expected_source=expected_source,
+                    expected_target=expected_target,
+                    policy=api.AutoSyncPolicy(**policy),
+                    approved_hunk_ids=approved_hunk_ids or [],
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
     async def upsert_unified_capability_item(
         capability_id: str,
         item: dict[str, Any],
