@@ -2367,6 +2367,7 @@ class AutoSyncRequest(BaseModel):
     expected_target: str | None = None
     policy: AutoSyncPolicy
     approved_hunk_ids: list[str] = []
+    llm_hunk_ids: list[str] = []
 
 
 class UpsertUnifiedCapabilityItemRequest(BaseModel):
@@ -2687,6 +2688,7 @@ def _auto_sync_plan(
     target_side: str,
     policy: AutoSyncPolicy,
     approved_hunk_ids: set[str],
+    llm_hunk_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     selected_rows: list[dict[str, Any]] = []
     log: list[dict[str, Any]] = []
@@ -2702,7 +2704,7 @@ def _auto_sync_plan(
             status = "applied"
         elif mode == "review":
             status = "pending"
-        elif mode == "llm":
+        elif mode == "llm" or (llm_hunk_ids is not None and hunk_id in llm_hunk_ids):
             llm_candidates.append({
                 "hunk_id": hunk_id,
                 "operation": operation,
@@ -2783,6 +2785,7 @@ async def auto_sync(req: AutoSyncRequest):
         raise HTTPException(status_code=400, detail="source and target must share the same sync capability")
     target_side = _target_side(source, target)
     approved = set(req.approved_hunk_ids)
+    llm_hunk_ids = set(req.llm_hunk_ids)
     with _lock:
         source_text, source_exists = _read_entry_current(source)
         target_text, target_exists = _read_entry_current(target)
@@ -2796,7 +2799,7 @@ async def auto_sync(req: AutoSyncRequest):
         unified_text = source_text if source["role"] == "unified" else target_text
         specific_text = source_text if source["role"] == "specific" else target_text
         hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
-        selected_rows, log, llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
+        selected_rows, log, llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved, llm_hunk_ids)
     if llm_candidates:
         approved.update(_llm_review_hunk_ids({
             "capability_id": req.capability_id,
@@ -2820,7 +2823,7 @@ async def auto_sync(req: AutoSyncRequest):
         unified_text = source_text if source["role"] == "unified" else target_text
         specific_text = source_text if source["role"] == "specific" else target_text
         hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
-        selected_rows, log, _llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
+        selected_rows, log, _llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved, llm_hunk_ids)
         next_target_text = _apply_rows_to_content(target_text, selected_rows, target_side) if selected_rows else target_text
         if next_target_text != target_text:
             _write_entry_if_unchanged(target, req.expected_target, next_target_text)
