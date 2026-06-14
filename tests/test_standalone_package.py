@@ -168,6 +168,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check('id="createCapability"' in content.content, "Goose GUI exposes add capability controls")
     check("auto_sync_provider_config_entry" in content.content, "Goose GUI can auto-merge with configured AI review")
     check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "Goose GUI always labels unified and specific diff panes")
+    check("Unified is missing" in content.content and "Specific is missing" in content.content, "Goose GUI keeps empty diff panes visible")
     check("Save source before applying" in content.content, "Goose GUI blocks apply while source edits are unsaved")
     check('"reset").onclick = () => { $("content").value = state.original;' in content.content, "Goose GUI reset restores apply buttons")
     check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "Goose GUI has mobile layout rules")

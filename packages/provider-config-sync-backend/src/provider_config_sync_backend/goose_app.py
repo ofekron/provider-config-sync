@@ -200,6 +200,16 @@ def goose_app_html() -> str:
       border-bottom: 1px solid color-mix(in srgb, var(--line), transparent 45%);
     }
     .diff-line:last-child { border-bottom: 0; }
+    .empty-state {
+      min-height: 58px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel-2), transparent 35%);
+      font-size: 12px;
+    }
     .ln { padding: 2px 8px; color: var(--muted); text-align: right; user-select: none; }
     .code { padding: 2px 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .same .code { color: var(--muted); }
@@ -545,6 +555,13 @@ def goose_app_html() -> str:
       return fragment;
     }
 
+    function emptyState(message) {
+      const element = document.createElement("div");
+      element.className = "empty-state";
+      element.textContent = message;
+      return element;
+    }
+
     async function renderCompare() {
       const container = $("compare");
       container.innerHTML = "";
@@ -568,10 +585,13 @@ def goose_app_html() -> str:
         toolbar.appendChild(iconButton("→", "Apply unified to specific", () => applyPair(unified, specific), dirty || !specific.writable || !unified.exists));
         toolbar.appendChild(iconButton("←", "Apply specific to unified", () => applyPair(specific, unified), dirty || !unified.writable || !specific.exists));
         toolbar.appendChild(iconButton("✦", "AI auto-merge into specific", () => aiMergePair(unified, specific), dirty || !specific.writable || !unified.exists));
-        card.querySelectorAll(".diff-title span")[1].textContent = tokens(unified.token_count) + " tokens";
-        card.querySelectorAll(".diff-title span")[3].textContent = specific.exists ? tokens(specific.token_count) + " tokens" : "empty";
-        card.querySelectorAll(".diff-side")[0].appendChild(renderDiffSide(rows, "unified"));
-        card.querySelectorAll(".diff-side")[1].appendChild(renderDiffSide(rows, "specific"));
+        const sides = card.querySelectorAll(".diff-side");
+        card.querySelectorAll(".diff-title span")[1].textContent = unified.exists ? tokens(unified.token_count) + " tokens" : "missing";
+        card.querySelectorAll(".diff-title span")[3].textContent = specific.exists ? tokens(specific.token_count) + " tokens" : "missing";
+        if (!unifiedContent) sides[0].appendChild(emptyState(unified.exists ? "Unified is empty" : "Unified is missing"));
+        if (!specificContent) sides[1].appendChild(emptyState(specific.exists ? "Specific is empty" : "Specific is missing"));
+        sides[0].appendChild(renderDiffSide(rows, "unified"));
+        sides[1].appendChild(renderDiffSide(rows, "specific"));
         container.appendChild(card);
       }
       app.resize();
