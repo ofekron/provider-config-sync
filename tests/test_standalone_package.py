@@ -176,6 +176,17 @@ def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
     check("flex: 0 0 auto;" in specifics_rule, "specifics view uses content height")
 
 
+def t_file_actions_live_in_diff_header() -> None:
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    styles = _UI_STYLES.read_text(encoding="utf-8")
+    check("provider-sync-counterpart-actions" not in page, "file action buttons are not rendered above the diff")
+    check("provider-sync-counterpart-actions" not in styles, "stale counterpart action styles are removed")
+    check("unifiedHeaderActions=" in page, "unified file actions are passed to the diff header")
+    check("specificHeaderActions=" in page, "specific file actions are passed to the diff header")
+    check("provider-sync-aligned-diff-header-actions" in page, "diff header renders action slots")
+    check("provider-sync-aligned-diff-header-actions" in styles, "diff header action slots are styled")
+
+
 def t_mcp_server_exposes_sync_tools() -> None:
     server = create_server()
     tools = asyncio.run(server.list_tools())
@@ -673,6 +684,7 @@ def main() -> int:
     t_standalone_app_loads_json_config()
     t_diff_line_editors_hide_textarea_chrome()
     t_diff_views_use_natural_height_without_internal_scrolling()
+    t_file_actions_live_in_diff_header()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()

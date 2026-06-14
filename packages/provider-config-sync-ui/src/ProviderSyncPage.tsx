@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   applyRowsToContent,
   buildAlignedDiffRows,
@@ -911,56 +911,6 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                         </div>
                         <small>{selectedSpecific.path}</small>
                       </div>
-                      <div className="provider-sync-counterpart-actions">
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          disabled={
-                            busy
-                            || isDirty(unified)
-                            || isDirty(selectedSpecific)
-                            || !selectedSpecific.exists
-                            || !unified.writable
-                          }
-                          onClick={() => void apply(selectedCapability, selectedSpecific, unified)}
-                        >
-                          From {providerSyncFileDisplayName(selectedSpecific)}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          disabled={
-                            busy
-                            || isDirty(unified)
-                            || isDirty(selectedSpecific)
-                            || !unified.exists
-                            || !selectedSpecific.writable
-                          }
-                          onClick={() => void apply(selectedCapability, unified, selectedSpecific)}
-                        >
-                          To {providerSyncFileDisplayName(selectedSpecific)}
-                        </button>
-                        {unified.backup_exists && (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            disabled={busy}
-                            onClick={() => void restoreFile(unified)}
-                          >
-                            Rollback Unified
-                          </button>
-                        )}
-                        {selectedSpecific.backup_exists && (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            disabled={busy}
-                            onClick={() => void restoreFile(selectedSpecific)}
-                          >
-                            Rollback {providerSyncFileDisplayName(selectedSpecific)}
-                          </button>
-                        )}
-                      </div>
                       {selectedSpecific.read_error ? (
                         <div className="provider-sync-empty">{selectedSpecific.read_error}</div>
                       ) : !selectedSpecific.exists ? (
@@ -1005,6 +955,62 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                           }}
                           onSaveUnified={() => void saveFile(unified)}
                           onSaveSpecific={() => void saveFile(selectedSpecific)}
+                          unifiedHeaderActions={(
+                            <>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                disabled={
+                                  busy
+                                  || isDirty(unified)
+                                  || isDirty(selectedSpecific)
+                                  || !selectedSpecific.exists
+                                  || !unified.writable
+                                }
+                                onClick={() => void apply(selectedCapability, selectedSpecific, unified)}
+                              >
+                                From {providerSyncFileDisplayName(selectedSpecific)}
+                              </button>
+                              {unified.backup_exists && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  disabled={busy}
+                                  onClick={() => void restoreFile(unified)}
+                                >
+                                  Rollback Unified
+                                </button>
+                              )}
+                            </>
+                          )}
+                          specificHeaderActions={(
+                            <>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                disabled={
+                                  busy
+                                  || isDirty(unified)
+                                  || isDirty(selectedSpecific)
+                                  || !unified.exists
+                                  || !selectedSpecific.writable
+                                }
+                                onClick={() => void apply(selectedCapability, unified, selectedSpecific)}
+                              >
+                                To {providerSyncFileDisplayName(selectedSpecific)}
+                              </button>
+                              {selectedSpecific.backup_exists && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  disabled={busy}
+                                  onClick={() => void restoreFile(selectedSpecific)}
+                                >
+                                  Rollback {providerSyncFileDisplayName(selectedSpecific)}
+                                </button>
+                              )}
+                            </>
+                          )}
                         />
                       )}
                     </section>
@@ -1257,6 +1263,8 @@ function EditableAlignedFileDiff({
   onApplySpecificRows,
   onSaveUnified,
   onSaveSpecific,
+  unifiedHeaderActions,
+  specificHeaderActions,
 }: {
   busy: boolean;
   unified: ProviderSyncFile;
@@ -1273,6 +1281,8 @@ function EditableAlignedFileDiff({
   onApplySpecificRows: (rows: AlignedDiffRow[]) => void;
   onSaveUnified: () => void;
   onSaveSpecific: () => void;
+  unifiedHeaderActions?: ReactNode;
+  specificHeaderActions?: ReactNode;
 }) {
   return (
     <AlignedDiffView
@@ -1283,6 +1293,8 @@ function EditableAlignedFileDiff({
       rightPath={specific.path}
       unifiedContent={debouncedUnifiedContent}
       specificContent={debouncedSpecificContent}
+      leftHeaderActions={unifiedHeaderActions}
+      rightHeaderActions={specificHeaderActions}
       editable={{
         busy,
         leftDirty: unifiedDirty,
@@ -1391,6 +1403,7 @@ function DiffHeaderSide({
   writable,
   busy,
   onSave,
+  actions,
 }: {
   label: string;
   path?: string;
@@ -1398,6 +1411,7 @@ function DiffHeaderSide({
   writable: boolean;
   busy: boolean;
   onSave: () => void;
+  actions?: ReactNode;
 }) {
   return (
     <div className="provider-sync-aligned-diff-header-side">
@@ -1405,15 +1419,20 @@ function DiffHeaderSide({
         <span>{label}</span>
         {path && <small>{path}</small>}
       </div>
-      {dirty && (
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={busy || !writable}
-          onClick={onSave}
-        >
-          Save {label}
-        </button>
+      {(dirty || actions) && (
+        <div className="provider-sync-aligned-diff-header-actions">
+          {actions}
+          {dirty && (
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={busy || !writable}
+              onClick={onSave}
+            >
+              Save {label}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1483,13 +1502,14 @@ function ArrowApplyButton({
   );
 }
 
-function DiffHeaderLabel({ label, path }: { label: string; path?: string }) {
+function DiffHeaderLabel({ label, path, actions }: { label: string; path?: string; actions?: ReactNode }) {
   return (
     <div className="provider-sync-aligned-diff-header-side">
       <div>
         <span>{label}</span>
         {path && <small>{path}</small>}
       </div>
+      {actions && <div className="provider-sync-aligned-diff-header-actions">{actions}</div>}
     </div>
   );
 }
@@ -1502,6 +1522,8 @@ function AlignedDiffView({
   rightPath,
   unifiedContent,
   specificContent,
+  leftHeaderActions,
+  rightHeaderActions,
   editable,
 }: {
   className?: string;
@@ -1511,6 +1533,8 @@ function AlignedDiffView({
   rightPath?: string;
   unifiedContent: string;
   specificContent: string;
+  leftHeaderActions?: ReactNode;
+  rightHeaderActions?: ReactNode;
   editable?: EditableDiffControls;
 }) {
   const rows = useMemo(
@@ -1563,9 +1587,10 @@ function AlignedDiffView({
             writable={editable.leftWritable}
             busy={editable.busy}
             onSave={editable.onSaveLeft}
+            actions={leftHeaderActions}
           />
         ) : (
-          <DiffHeaderLabel label={leftLabel} path={leftPath} />
+          <DiffHeaderLabel label={leftLabel} path={leftPath} actions={leftHeaderActions} />
         )}
         <DiffBlockControls
           counts={counts}
@@ -1582,9 +1607,10 @@ function AlignedDiffView({
             writable={editable.rightWritable}
             busy={editable.busy}
             onSave={editable.onSaveRight}
+            actions={rightHeaderActions}
           />
         ) : (
-          <DiffHeaderLabel label={rightLabel} path={rightPath} />
+          <DiffHeaderLabel label={rightLabel} path={rightPath} actions={rightHeaderActions} />
         )}
       </div>
       <div className="provider-sync-aligned-diff-body">
