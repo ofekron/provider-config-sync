@@ -472,6 +472,63 @@ def t_auto_sync_llm_mode_uses_configured_reviewer() -> None:
         shutil.rmtree(wipe)
 
 
+def t_auto_sync_llm_can_review_one_hunk() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-llm-hunk-"))
+    try:
+        project = (wipe / "project").resolve()
+        project.mkdir()
+        claude = project / "CLAUDE.md"
+        claude.write_text("alpha\nbravo\ncharlie\ndelta\n", encoding="utf-8")
+        reviewed: list[str] = []
+
+        def review(context: dict) -> list[str]:
+            reviewed.extend(item["hunk_id"] for item in context["candidates"])
+            return reviewed
+
+        api.configure(
+            provider_records=lambda: [{"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")}],
+            project_records=lambda: [{"path": str(project), "node_id": "primary"}],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+            llm_review=review,
+        )
+        payload = api._discover(str(project))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified = instructions["unified"]
+        Path(unified["path"]).parent.mkdir(parents=True, exist_ok=True)
+        Path(unified["path"]).write_text("alpha\nbravo\ncharlie\n", encoding="utf-8")
+
+        payload = api._discover(str(project))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified = instructions["unified"]
+        by_kind = {entry["provider_kinds"][0]: entry for entry in instructions["specifics"]}
+        preview = asyncio.run(api.auto_sync(api.AutoSyncRequest(
+            cwd=str(project),
+            capability_id="instructions",
+            source_entry_id=unified["entry_id"],
+            target_entry_id=by_kind["claude"]["entry_id"],
+            expected_source=unified["content"],
+            expected_target=by_kind["claude"]["content"],
+            policy=api.AutoSyncPolicy(additive="off", removal="review", change="off"),
+        )))
+        pending = next(item for item in preview["log_head"] if item["status"] == "pending")
+        result = asyncio.run(api.auto_sync(api.AutoSyncRequest(
+            cwd=str(project),
+            capability_id="instructions",
+            source_entry_id=unified["entry_id"],
+            target_entry_id=by_kind["claude"]["entry_id"],
+            expected_source=unified["content"],
+            expected_target=by_kind["claude"]["content"],
+            policy=api.AutoSyncPolicy(additive="off", removal="off", change="off"),
+            llm_hunk_ids=[pending["hunk_id"]],
+        )))
+        check(reviewed == [pending["hunk_id"]], "LLM reviewer receives only requested hunk")
+        check(result["applied_count"] == 1, "LLM-approved hunk applies")
+        check(claude.read_text(encoding="utf-8") == "alpha\nbravo\ncharlie\n", "single LLM hunk updates target")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_auto_sync_settings_resolve_hierarchy() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-settings-"))
     try:
@@ -526,6 +583,7 @@ def main() -> int:
     t_standalone_commands_convert_provider_formats()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
     t_auto_sync_llm_mode_uses_configured_reviewer()
+    t_auto_sync_llm_can_review_one_hunk()
     t_auto_sync_settings_resolve_hierarchy()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")

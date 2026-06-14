@@ -2236,6 +2236,45 @@ def _write_entry_if_unchanged(entry: dict, expected: str | None, content: str) -
     _content_adapter(content_kind).write_if_unchanged(path, expected, content, entry["category"])
 
 
+def _restore_entry_backup_if_unchanged(entry: dict, expected: str | None) -> None:
+    current, exists = _read_entry_current(entry)
+    if _expected_content(current, exists) != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before restoring")
+    real = _real_existing_file(Path(entry["path"]))
+    if real is None:
+        raise HTTPException(status_code=409, detail="file disappeared; refresh before restoring")
+    backup = _backup_path(real)
+    marker = _backup_marker_path(backup)
+    if not _backup_exists(real):
+        raise HTTPException(status_code=404, detail="backup does not exist")
+    backup_content = backup.read_bytes()
+    if hashlib.sha256(backup_content).hexdigest().encode("ascii") != marker.read_bytes():
+        raise HTTPException(status_code=500, detail=f"backup integrity check failed: {backup}")
+    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(real, flags)
+    except OSError as e:
+        raise HTTPException(status_code=409, detail=f"file changed or became unsafe: {e}")
+    with os.fdopen(fd, "r+b") as fh:
+        opened_stat = os.fstat(fh.fileno())
+        try:
+            path_stat = real.stat(follow_symlinks=False)
+        except OSError as e:
+            raise HTTPException(status_code=409, detail=f"file changed: {e}")
+        if (
+            not stat.S_ISREG(path_stat.st_mode)
+            or opened_stat.st_dev != path_stat.st_dev
+            or opened_stat.st_ino != path_stat.st_ino
+            or opened_stat.st_nlink != 1
+        ):
+            raise HTTPException(status_code=409, detail="file changed; refresh before restoring")
+        fh.seek(0)
+        fh.write(backup_content)
+        fh.truncate()
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 async def _broadcast_changed(scope: str, category: str, capability_id: str, path: str, cwd: str) -> None:
     result = _broadcast_changed_source(scope, category, capability_id, path, cwd)
     if hasattr(result, "__await__"):
@@ -2255,6 +2294,13 @@ class WriteNativeFileRequest(BaseModel):
     content: str
 
 
+class RestoreNativeFileRequest(BaseModel):
+    cwd: str = ""
+    entry_id: str | None = None
+    path: str | None = None
+    expected_content: str | None = None
+
+
 @router.put("/file")
 async def write_native_file(req: WriteNativeFileRequest):
     entries = _entry_map(req.cwd)
@@ -2269,6 +2315,21 @@ async def write_native_file(req: WriteNativeFileRequest):
         if _expected_content(current, exists) != req.expected_content:
             raise HTTPException(status_code=409, detail="file changed; refresh before saving")
         _write_entry_if_unchanged(entry, req.expected_content, req.content)
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    return {"ok": True, "path": entry["path"]}
+
+
+@router.post("/file/restore")
+async def restore_native_file(req: RestoreNativeFileRequest):
+    entries = _entry_map(req.cwd)
+    entry_key = req.entry_id or req.path
+    if entry_key is None:
+        raise HTTPException(status_code=400, detail="entry_id is required")
+    entry = entries.get(entry_key)
+    if entry is None or not entry.get("writable"):
+        raise HTTPException(status_code=400, detail="entry is not an editable sync file")
+    with _lock:
+        _restore_entry_backup_if_unchanged(entry, req.expected_content)
     await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
     return {"ok": True, "path": entry["path"]}
 
@@ -2306,6 +2367,7 @@ class AutoSyncRequest(BaseModel):
     expected_target: str | None = None
     policy: AutoSyncPolicy
     approved_hunk_ids: list[str] = []
+    llm_hunk_ids: list[str] = []
 
 
 class UpsertUnifiedCapabilityItemRequest(BaseModel):
@@ -2626,6 +2688,7 @@ def _auto_sync_plan(
     target_side: str,
     policy: AutoSyncPolicy,
     approved_hunk_ids: set[str],
+    llm_hunk_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     selected_rows: list[dict[str, Any]] = []
     log: list[dict[str, Any]] = []
@@ -2641,7 +2704,7 @@ def _auto_sync_plan(
             status = "applied"
         elif mode == "review":
             status = "pending"
-        elif mode == "llm":
+        elif mode == "llm" or (llm_hunk_ids is not None and hunk_id in llm_hunk_ids):
             llm_candidates.append({
                 "hunk_id": hunk_id,
                 "operation": operation,
@@ -2722,6 +2785,7 @@ async def auto_sync(req: AutoSyncRequest):
         raise HTTPException(status_code=400, detail="source and target must share the same sync capability")
     target_side = _target_side(source, target)
     approved = set(req.approved_hunk_ids)
+    llm_hunk_ids = set(req.llm_hunk_ids)
     with _lock:
         source_text, source_exists = _read_entry_current(source)
         target_text, target_exists = _read_entry_current(target)
@@ -2735,7 +2799,7 @@ async def auto_sync(req: AutoSyncRequest):
         unified_text = source_text if source["role"] == "unified" else target_text
         specific_text = source_text if source["role"] == "specific" else target_text
         hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
-        selected_rows, log, llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
+        selected_rows, log, llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved, llm_hunk_ids)
     if llm_candidates:
         approved.update(_llm_review_hunk_ids({
             "capability_id": req.capability_id,
@@ -2759,7 +2823,7 @@ async def auto_sync(req: AutoSyncRequest):
         unified_text = source_text if source["role"] == "unified" else target_text
         specific_text = source_text if source["role"] == "specific" else target_text
         hunks = _diff_hunks(_diff_rows(unified_text, specific_text))
-        selected_rows, log, _llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved)
+        selected_rows, log, _llm_candidates = _auto_sync_plan(hunks, target_side, req.policy, approved, llm_hunk_ids)
         next_target_text = _apply_rows_to_content(target_text, selected_rows, target_side) if selected_rows else target_text
         if next_target_text != target_text:
             _write_entry_if_unchanged(target, req.expected_target, next_target_text)
