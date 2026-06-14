@@ -853,8 +853,16 @@
   color: var(--text-primary);
   font: inherit;
   line-height: inherit;
+  display: block;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  scrollbar-width: none;
   white-space: pre-wrap;
+}
+
+.provider-sync-aligned-diff-cell-editor::-webkit-resizer,
+.provider-sync-aligned-diff-cell-editor::-webkit-scrollbar {
+  display: none;
 }
 
 .provider-sync-aligned-diff-cell-editor:focus {

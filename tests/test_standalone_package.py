@@ -18,6 +18,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve()
 _ROOT = _HERE.parents[1]
 _PACKAGE_SRC = _ROOT / "packages" / "provider-config-sync-backend" / "src"
+_UI_STYLES = _ROOT / "packages" / "provider-config-sync-ui" / "src" / "styles.css"
 if str(_PACKAGE_SRC) not in sys.path:
     sys.path.insert(0, str(_PACKAGE_SRC))
 
@@ -133,6 +134,22 @@ def t_standalone_app_loads_json_config() -> None:
         check("/api/provider-config-sync" in paths, "standalone FastAPI app mounts provider-config-sync route")
     finally:
         shutil.rmtree(wipe)
+
+
+def t_diff_line_editors_hide_textarea_chrome() -> None:
+    styles = _UI_STYLES.read_text(encoding="utf-8")
+    editor_rule = styles.split(".provider-sync-aligned-diff-cell-editor {", 1)[1].split("}", 1)[0]
+    check("resize: none;" in editor_rule, "diff line editors disable manual resize")
+    check("overflow: hidden;" in editor_rule, "diff line editors hide textarea scroll chrome")
+    check("scrollbar-width: none;" in editor_rule, "diff line editors hide firefox scrollbars")
+    check(
+        ".provider-sync-aligned-diff-cell-editor::-webkit-resizer" in styles,
+        "diff line editors hide webkit resize handles",
+    )
+    check(
+        ".provider-sync-aligned-diff-cell-editor::-webkit-scrollbar" in styles,
+        "diff line editors hide webkit scrollbars",
+    )
 
 
 def t_mcp_server_exposes_sync_tools() -> None:
@@ -630,6 +647,7 @@ def t_auto_sync_settings_resolve_hierarchy() -> None:
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
+    t_diff_line_editors_hide_textarea_chrome()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
