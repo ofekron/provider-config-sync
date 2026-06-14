@@ -119,6 +119,39 @@ def goose_app_html() -> str:
     .stat { padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
     .stat b { display: block; font-size: 16px; }
     .list { padding: 8px; display: grid; gap: 6px; }
+    .cap-group { display: grid; gap: 6px; }
+    .cap-group-head {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+      width: 100%;
+      padding: 6px 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    .cap-group-head b {
+      color: var(--text);
+      font-size: 12px;
+      text-transform: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cap-group-count {
+      min-width: 20px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 1px 6px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .cap-group-items { display: grid; gap: 6px; }
+    .cap-group.collapsed .cap-group-items { display: none; }
     .cap {
       display: grid;
       gap: 4px;
@@ -256,6 +289,11 @@ def goose_app_html() -> str:
         min-width: min(78vw, 280px);
         scroll-snap-align: start;
       }
+      .cap-group {
+        min-width: min(78vw, 280px);
+        scroll-snap-align: start;
+      }
+      .cap-group .cap { min-width: 0; }
       .content {
         overflow: visible;
         padding: 10px;
@@ -464,7 +502,7 @@ def goose_app_html() -> str:
     }
 
     const app = new McpApp();
-    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "", entryContents: new Map() };
+    const state = { cwd: "", payload: null, capability: null, entries: [], entry: null, original: "", entryContents: new Map(), collapsedGroups: new Set() };
     const $ = id => document.getElementById(id);
 
     function setStatus(message, isError) {
@@ -480,6 +518,10 @@ def goose_app_html() -> str:
     function entryTitle(entry) {
       const providers = (entry.provider_names || []).join(", ");
       return (providers || entry.role) + " - " + entry.label;
+    }
+
+    function groupTitle(capability) {
+      return capability.scope + " / " + capability.category;
     }
 
     function iconButton(symbol, label, onClick, disabled) {
@@ -600,18 +642,40 @@ def goose_app_html() -> str:
     function renderList() {
       const capabilities = (state.payload && state.payload.capabilities) || [];
       $("capabilities").innerHTML = "";
+      const groups = new Map();
       for (const capability of capabilities) {
-        const button = document.createElement("button");
-        button.className = "cap" + (state.capability && state.capability.id === capability.id ? " active" : "");
-        button.innerHTML = "<strong></strong><span class='meta'></span><span></span>";
-        button.children[0].textContent = capability.name;
-        button.children[1].textContent = capability.scope + " / " + capability.category;
-        button.children[2].innerHTML =
-          "<span class='pill " + (capability.has_diffs ? "diff" : "ok") + "'>" + (capability.has_diffs ? "diff" : "aligned") + "</span>" +
-          "<span class='pill'>" + tokens(capability.total_token_count) + " tokens</span>" +
-          "<span class='pill'>" + capability.specific_count + " files</span>";
-        button.onclick = () => selectCapability(capability.id);
-        $("capabilities").appendChild(button);
+        const key = groupTitle(capability);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(capability);
+      }
+      for (const [key, items] of groups) {
+        const group = document.createElement("section");
+        const collapsed = state.collapsedGroups.has(key);
+        group.className = "cap-group" + (collapsed ? " collapsed" : "");
+        group.innerHTML = "<button class='cap-group-head'><span></span><b></b><span class='cap-group-count'></span></button><div class='cap-group-items'></div>";
+        group.querySelector(".cap-group-head span").textContent = collapsed ? "▸" : "▾";
+        group.querySelector("b").textContent = key;
+        group.querySelector(".cap-group-count").textContent = items.length;
+        group.querySelector(".cap-group-head").onclick = () => {
+          if (state.collapsedGroups.has(key)) state.collapsedGroups.delete(key);
+          else state.collapsedGroups.add(key);
+          renderList();
+        };
+        const body = group.querySelector(".cap-group-items");
+        for (const capability of items) {
+          const button = document.createElement("button");
+          button.className = "cap" + (state.capability && state.capability.id === capability.id ? " active" : "");
+          button.innerHTML = "<strong></strong><span class='meta'></span><span></span>";
+          button.children[0].textContent = capability.name;
+          button.children[1].textContent = capability.scope + " / " + capability.category;
+          button.children[2].innerHTML =
+            "<span class='pill " + (capability.has_diffs ? "diff" : "ok") + "'>" + (capability.has_diffs ? "diff" : "aligned") + "</span>" +
+            "<span class='pill'>" + tokens(capability.total_token_count) + " tokens</span>" +
+            "<span class='pill'>" + capability.specific_count + " files</span>";
+          button.onclick = () => selectCapability(capability.id);
+          body.appendChild(button);
+        }
+        $("capabilities").appendChild(group);
       }
       app.resize();
     }

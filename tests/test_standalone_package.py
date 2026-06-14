@@ -166,6 +166,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check("tools/call" in content.content, "Goose GUI can call provider config sync tools")
     check("create_provider_config_capability" in content.content, "Goose GUI can create capabilities")
     check('id="createCapability"' in content.content, "Goose GUI exposes add capability controls")
+    check("collapsedGroups" in content.content and "cap-group-head" in content.content, "Goose GUI can collapse capability groups")
     check("auto_sync_provider_config_entry" in content.content, "Goose GUI can auto-merge with configured AI review")
     check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "Goose GUI always labels unified and specific diff panes")
     check("Unified is missing" in content.content and "Specific is missing" in content.content, "Goose GUI keeps empty diff panes visible")
