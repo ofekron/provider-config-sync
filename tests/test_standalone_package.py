@@ -176,9 +176,11 @@ def t_agent_integrations_install_native_commands() -> None:
     try:
         os.environ["HOME"] = str(wipe)
         results = install_agent_integrations()
-        check(all(line.startswith("wrote:") for line in results), "agent integration installer writes native commands/prompts")
+        check(all(line.startswith("wrote:") for line in results), "agent integration installer writes native commands/skills")
         check((wipe / ".claude" / "commands" / "provider-config-sync.md").is_file(), "Claude command is installed")
-        check((wipe / ".codex" / "prompts" / "provider-config-sync.md").is_file(), "Codex prompt is installed")
+        codex_skill = wipe / ".agents" / "skills" / "provider-config-sync" / "SKILL.md"
+        check(codex_skill.is_file(), "Codex skill is installed")
+        check("name: provider-config-sync" in codex_skill.read_text(encoding="utf-8"), "Codex skill has required frontmatter")
         check((wipe / ".gemini" / "commands" / "provider-config-sync.toml").is_file(), "Gemini command is installed")
     finally:
         if old_home is None:
@@ -241,7 +243,9 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
 
 def t_standalone_commands_convert_provider_formats() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-commands-"))
+    old_home = os.environ.get("HOME")
     try:
+        os.environ["HOME"] = str(wipe)
         project = (wipe / "project").resolve()
         project.mkdir()
         claude_command = project / ".claude" / "commands" / "review.md"
@@ -268,9 +272,10 @@ def t_standalone_commands_convert_provider_formats() -> None:
         payload = api._discover(str(project))
         command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
-        check(set(by_kind) == {"claude", "gemini"}, "project commands offer Claude and Gemini targets")
-        check(command["name"] == "Command/custom prompt: review", "command capability label distinguishes prompts")
+        check(set(by_kind) == {"claude", "codex", "gemini"}, "project commands offer Claude, Codex, and Gemini targets")
+        check(command["name"] == "Command/skill: review", "command capability label distinguishes Codex skills")
         check(by_kind["claude"]["label"] == "Claude command", "Claude command label is provider-specific")
+        check(by_kind["codex"]["label"] == "Codex skill", "Codex command target is a skill")
         check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Grep", "Claude command metadata is normalized")
 
         asyncio.run(
@@ -304,18 +309,49 @@ def t_standalone_commands_convert_provider_formats() -> None:
         gemini_data = tomllib.loads(gemini_command.read_text(encoding="utf-8"))
         check(gemini_data["description"] == "Review code", "Gemini command gets description")
         check(gemini_data["prompt"] == "Review the changed files.\n", "Gemini command gets prompt")
+        asyncio.run(
+            api.apply_native_file(
+                api.ApplyNativeFileRequest(
+                    cwd=str(project),
+                    capability_id="command-review",
+                    source_entry_id=command["unified"]["entry_id"],
+                    target_entry_id=by_kind["codex"]["entry_id"],
+                    expected_source=command["unified"]["content"],
+                    expected_target=None,
+                )
+            )
+        )
+        codex_skill = project / ".agents" / "skills" / "command-review" / "SKILL.md"
+        codex_skill_content = codex_skill.read_text(encoding="utf-8")
+        check("name: command-review" in codex_skill_content, "Codex command skill gets a command-scoped skill name")
+        check("description: Review code" in codex_skill_content, "Codex command skill gets description")
+        check("provider-config-sync-description: Review code" in codex_skill_content, "Codex command skill preserves command description")
+        check("Review the changed files." in codex_skill_content, "Codex command skill gets instructions")
 
         payload = api._discover("")
-        check("command-review" not in {capability["capability_id"] for capability in payload["groups"]["global"]}, "global command absent before Codex prompt exists")
-        codex_prompt = wipe / "codex" / "prompts" / "review.md"
-        codex_prompt.parent.mkdir(parents=True)
-        codex_prompt.write_text("Review the worktree.\n", encoding="utf-8")
+        check("command-review" not in {capability["capability_id"] for capability in payload["groups"]["global"]}, "global command absent before Codex command skill exists")
+        codex_skill = wipe / ".agents" / "skills" / "command-review" / "SKILL.md"
+        codex_skill.parent.mkdir(parents=True)
+        codex_skill.write_text(
+            "---\n"
+            "name: command-review\n"
+            "description: Review code\n"
+            "provider-config-sync-kind: command\n"
+            "provider-config-sync-name: review\n"
+            "---\n"
+            "Review the worktree.\n",
+            encoding="utf-8",
+        )
         payload = api._discover("")
         global_command = next(capability for capability in payload["groups"]["global"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in global_command["specifics"]}
-        check("codex" in by_kind, "Codex custom prompt appears as global command")
-        check(by_kind["codex"]["label"] == "Codex custom prompt", "Codex prompt label is provider-specific")
+        check("codex" in by_kind, "Codex command skill appears as global command")
+        check(by_kind["codex"]["label"] == "Codex skill", "Codex skill label is provider-specific")
     finally:
+        if old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old_home
         shutil.rmtree(wipe)
 
 

@@ -51,8 +51,15 @@ def claude_command() -> str:
     return f"---\n{frontmatter}\n---\n{_SYNC_PROMPT}"
 
 
-def codex_prompt() -> str:
-    return _SYNC_PROMPT
+def codex_skill() -> str:
+    frontmatter = yaml.safe_dump(
+        {
+            "name": "provider-config-sync",
+            "description": "Sync Claude, Codex, and Gemini provider config capabilities",
+        },
+        sort_keys=False,
+    ).strip()
+    return f"---\n{frontmatter}\n---\n{_SYNC_PROMPT}"
 
 
 def gemini_command() -> str:
@@ -63,7 +70,7 @@ def gemini_command() -> str:
 def install_agent_integrations(*, force: bool = False) -> list[str]:
     return [
         _write_new(_expand("~/.claude/commands/provider-config-sync.md"), claude_command(), force),
-        _write_new(_expand("~/.codex/prompts/provider-config-sync.md"), codex_prompt(), force),
+        _write_new(_expand("~/.agents/skills/provider-config-sync/SKILL.md"), codex_skill(), force),
         _write_new(_expand("~/.gemini/commands/provider-config-sync.toml"), gemini_command(), force),
     ]
 

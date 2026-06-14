@@ -50,6 +50,11 @@ _CONTENT_MARKDOWN_AGENT = "markdown_agent"
 _CONTENT_TOML_AGENT = "toml_agent"
 _CONTENT_MARKDOWN_COMMAND = "markdown_command"
 _CONTENT_TOML_COMMAND = "toml_command"
+_CONTENT_CODEX_COMMAND_SKILL = "codex_command_skill"
+_CODEX_COMMAND_SKILL_PREFIX = "command-"
+_CODEX_COMMAND_SKILL_KIND_KEY = "provider-config-sync-kind"
+_CODEX_COMMAND_SKILL_NAME_KEY = "provider-config-sync-name"
+_CODEX_COMMAND_SKILL_DESCRIPTION_KEY = "provider-config-sync-description"
 _lock = threading.Lock()
 
 
@@ -602,7 +607,7 @@ def _command_roots_for_provider(
         if kind == "gemini":
             return [_provider_config_dir(provider) / "commands"]
         if kind == "codex":
-            return [_codex_home(provider) / "prompts"]
+            return [_agents_skills_dir()]
         return []
     if project_root is None:
         return []
@@ -610,10 +615,14 @@ def _command_roots_for_provider(
         return [project_root / ".claude" / "commands"]
     if kind == "gemini":
         return [project_root / ".gemini" / "commands"]
+    if kind == "codex":
+        return [project_root / ".agents" / "skills"]
     return []
 
 
 def _command_content_kind(provider_kind: str) -> str:
+    if provider_kind == "codex":
+        return _CONTENT_CODEX_COMMAND_SKILL
     return _CONTENT_TOML_COMMAND if provider_kind == "gemini" else _CONTENT_MARKDOWN_COMMAND
 
 
@@ -626,13 +635,21 @@ def _command_capability_id(name: str) -> str:
 
 
 def _command_capability_name(name: str) -> str:
-    return f"Command/custom prompt: {name}"
+    return f"Command/skill: {name}"
 
 
 def _command_provider_label(provider_name: str, provider_kind: str) -> str:
     if provider_kind == "codex":
-        return f"{provider_name} custom prompt"
+        return f"{provider_name} skill"
     return f"{provider_name} command"
+
+
+def _codex_command_skill_dir(name: str) -> str:
+    return f"{_CODEX_COMMAND_SKILL_PREFIX}{_safe_agent_filename(name)}"
+
+
+def _codex_command_skill_name(name: str) -> str:
+    return _codex_command_skill_dir(name)
 
 
 def _frontmatter_split(path: Path, content: str) -> tuple[dict, str]:
@@ -749,6 +766,36 @@ def _markdown_command_payload(path: Path, content: str) -> dict:
         description=description,
         instructions=body,
         metadata=metadata,
+    )
+
+
+def _codex_command_skill_payload(path: Path, content: str) -> dict:
+    payload = _markdown_skill_payload(path, content)
+    metadata = payload.get("metadata") or {}
+    if metadata.get(_CODEX_COMMAND_SKILL_KIND_KEY) != "command":
+        raise HTTPException(status_code=400, detail=f"Codex command skill missing command marker: {path}")
+    command_name = metadata.get(_CODEX_COMMAND_SKILL_NAME_KEY)
+    if not isinstance(command_name, str) or not command_name.strip():
+        raise HTTPException(status_code=400, detail=f"Codex command skill missing command name: {path}")
+    command_description = metadata.get(_CODEX_COMMAND_SKILL_DESCRIPTION_KEY, payload["description"])
+    if not isinstance(command_description, str):
+        raise HTTPException(status_code=400, detail=f"Codex command skill description marker must be a string: {path}")
+    command_metadata = {
+        key: value
+        for key, value in metadata.items()
+        if key
+        not in {
+            _CODEX_COMMAND_SKILL_KIND_KEY,
+            _CODEX_COMMAND_SKILL_NAME_KEY,
+            _CODEX_COMMAND_SKILL_DESCRIPTION_KEY,
+        }
+    }
+    return _normalized_command_payload(
+        path=path,
+        name=command_name,
+        description=command_description,
+        instructions=payload["instructions"],
+        metadata=command_metadata,
     )
 
 
@@ -900,16 +947,48 @@ def _command_names_in_root(root: Path, suffix: str) -> set[str]:
     }
 
 
+def _codex_command_names_in_root(root: Path) -> set[str]:
+    if not root.is_dir() or root.is_symlink():
+        return set()
+    names: set[str] = set()
+    for child in root.iterdir():
+        if not child.is_dir() or child.is_symlink():
+            continue
+        skill_file = _skill_file_for_dir(child)
+        if skill_file is None:
+            continue
+        try:
+            content = _read_existing_text(skill_file)
+            if content is None:
+                continue
+            names.add(_codex_command_skill_payload(skill_file, content)["name"])
+        except HTTPException:
+            continue
+    return names
+
+
 def _command_names(providers: list[dict], scope: str, project_root: Path | None = None) -> set[str]:
     names: set[str] = set()
     for provider in providers:
-        suffix = _command_suffix(provider["kind"])
+        kind = provider["kind"]
         for root in _command_roots_for_provider(provider, scope, project_root):
-            names.update(_command_names_in_root(root, suffix))
+            if kind == "codex":
+                names.update(_codex_command_names_in_root(root))
+            else:
+                names.update(_command_names_in_root(root, _command_suffix(kind)))
     return names
 
 
 def _candidate_command_paths(provider: dict, roots: list[Path], name: str) -> list[Path]:
+    if provider["kind"] == "codex":
+        existing: list[Path] = []
+        for root in roots:
+            path = root / _codex_command_skill_dir(name) / "SKILL.md"
+            if path.is_file() and not path.is_symlink():
+                existing.append(path)
+        if existing:
+            return existing
+        return [roots[0] / _codex_command_skill_dir(name) / "SKILL.md"] if roots else []
     suffix = _command_suffix(provider["kind"])
     existing = [
         root / f"{name}{suffix}"
@@ -1294,6 +1373,13 @@ def _toml_command_current(path: Path) -> tuple[str, bool]:
     if content is None:
         return "", False
     return _normalized_item_text(_toml_command_payload(path, content)), True
+
+
+def _codex_command_skill_current(path: Path) -> tuple[str, bool]:
+    content = _read_existing_text(path)
+    if content is None:
+        return "", False
+    return _normalized_item_text(_codex_command_skill_payload(path, content)), True
 
 
 def _file_current(path: Path) -> tuple[str, bool]:
@@ -2056,6 +2142,24 @@ def _toml_command_from_normalized(content: str) -> str:
     return _toml_dumps(data)
 
 
+def _codex_command_skill_from_normalized(content: str) -> str:
+    payload = _item_payload_from_normalized(content, "command")
+    metadata = {
+        _CODEX_COMMAND_SKILL_KIND_KEY: "command",
+        _CODEX_COMMAND_SKILL_NAME_KEY: payload["name"],
+        _CODEX_COMMAND_SKILL_DESCRIPTION_KEY: payload["description"],
+        **(payload.get("metadata") or {}),
+    }
+    frontmatter = {
+        "name": _codex_command_skill_name(payload["name"]),
+        "description": payload["description"] or f"Run the {payload['name']} command workflow",
+        **metadata,
+    }
+    yaml_text = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True).strip()
+    body = payload["instructions"].rstrip() + "\n"
+    return f"---\n{yaml_text}\n---\n{body}"
+
+
 def _write_markdown_agent_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
     original = _read_existing_text(path)
     current = _normalized_item_text(_markdown_agent_payload(path, original)) if original is not None else None
@@ -2096,6 +2200,14 @@ def _write_toml_command_if_unchanged(path: Path, expected: str | None, content: 
     _write_if_unchanged(path, original, _toml_command_from_normalized(content), category)
 
 
+def _write_codex_command_skill_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
+    original = _read_existing_text(path)
+    current = _normalized_item_text(_codex_command_skill_payload(path, original)) if original is not None else None
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before saving")
+    _write_if_unchanged(path, original, _codex_command_skill_from_normalized(content), category)
+
+
 def _write_file_if_unchanged(path: Path, expected: str | None, content: str, category: str) -> None:
     _write_if_unchanged(path, expected, content, category)
 
@@ -2110,6 +2222,7 @@ def _content_adapter(content_kind: str) -> ContentAdapter:
         _CONTENT_TOML_AGENT: ContentAdapter(_toml_agent_current, _write_toml_agent_if_unchanged),
         _CONTENT_MARKDOWN_COMMAND: ContentAdapter(_markdown_command_current, _write_markdown_command_if_unchanged),
         _CONTENT_TOML_COMMAND: ContentAdapter(_toml_command_current, _write_toml_command_if_unchanged),
+        _CONTENT_CODEX_COMMAND_SKILL: ContentAdapter(_codex_command_skill_current, _write_codex_command_skill_if_unchanged),
     }
     adapter = adapters.get(content_kind)
     if adapter is None:
