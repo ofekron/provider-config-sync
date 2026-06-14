@@ -26,6 +26,10 @@
     "./items": {
       "types": "./dist/items.d.ts",
       "import": "./dist/items.js"
+    },
+    "./wire": {
+      "types": "./dist/wire.d.ts",
+      "import": "./dist/wire.js"
     }
   },
   "devDependencies": {

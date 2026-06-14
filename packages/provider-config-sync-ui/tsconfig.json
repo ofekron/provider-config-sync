@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "paths": {
+      "@better-agent/provider-config-sync-core": ["../provider-config-sync-core/dist/index.d.ts"],
+      "@better-agent/provider-config-sync-core/*": ["../provider-config-sync-core/dist/*.d.ts"]
+    }
+  },
+  "include": ["src"]
+}

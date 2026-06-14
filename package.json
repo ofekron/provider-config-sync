@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/provider-config-sync-core"
+    "packages/provider-config-sync-core",
+    "packages/provider-config-sync-ui"
   ],
   "scripts": {
-    "build:core": "npm --prefix packages/provider-config-sync-core run build"
+    "build:core": "npm --prefix packages/provider-config-sync-core run build",
+    "build:ui": "npm --prefix packages/provider-config-sync-ui run build"
   }
 }
