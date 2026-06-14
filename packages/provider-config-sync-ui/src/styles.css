@@ -24,19 +24,15 @@
   font-size: 12px;
   cursor: pointer;
 }
-}
 
 .provider-sync-page .btn-secondary:hover:not(:disabled) {
   color: var(--text-primary);
   border-color: var(--text-muted);
 }
-}
 
 .provider-sync-page .btn-secondary:disabled {
-.btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
 }
 
 .provider-sync-page .btn-primary {
@@ -49,14 +45,12 @@
   font-weight: 600;
   cursor: pointer;
 }
-}
+
 .provider-sync-page .btn-primary:hover:not(:disabled) {
-.btn-primary:hover:not(:disabled) {
   filter: brightness(1.1);
 }
-}
+
 .provider-sync-page .btn-primary:disabled {
-.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
