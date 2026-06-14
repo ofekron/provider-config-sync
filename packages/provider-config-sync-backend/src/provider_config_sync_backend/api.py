@@ -620,7 +620,13 @@ def _command_capability_id(name: str) -> str:
 
 
 def _command_capability_name(name: str) -> str:
-    return f"Command: /{name}"
+    return f"Command/custom prompt: {name}"
+
+
+def _command_provider_label(provider_name: str, provider_kind: str) -> str:
+    if provider_kind == "codex":
+        return f"{provider_name} custom prompt"
+    return f"{provider_name} command"
 
 
 def _frontmatter_split(path: Path, content: str) -> tuple[dict, str]:
@@ -931,7 +937,7 @@ def _command_candidates(
                     _command_capability_name(command_name),
                     kind,
                     provider_name,
-                    f"{provider_name} command",
+                    _command_provider_label(provider_name, kind),
                     "json",
                     True,
                     _command_content_kind(kind),

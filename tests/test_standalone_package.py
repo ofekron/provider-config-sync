@@ -176,7 +176,7 @@ def t_agent_integrations_install_native_commands() -> None:
     try:
         os.environ["HOME"] = str(wipe)
         results = install_agent_integrations()
-        check(all(line.startswith("wrote:") for line in results), "agent integration installer writes native commands")
+        check(all(line.startswith("wrote:") for line in results), "agent integration installer writes native commands/prompts")
         check((wipe / ".claude" / "commands" / "provider-config-sync.md").is_file(), "Claude command is installed")
         check((wipe / ".codex" / "prompts" / "provider-config-sync.md").is_file(), "Codex prompt is installed")
         check((wipe / ".gemini" / "commands" / "provider-config-sync.toml").is_file(), "Gemini command is installed")
@@ -269,6 +269,8 @@ def t_standalone_commands_convert_provider_formats() -> None:
         command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
         check(set(by_kind) == {"claude", "gemini"}, "project commands offer Claude and Gemini targets")
+        check(command["name"] == "Command/custom prompt: review", "command capability label distinguishes prompts")
+        check(by_kind["claude"]["label"] == "Claude command", "Claude command label is provider-specific")
         check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Grep", "Claude command metadata is normalized")
 
         asyncio.run(
@@ -312,6 +314,7 @@ def t_standalone_commands_convert_provider_formats() -> None:
         global_command = next(capability for capability in payload["groups"]["global"] if capability["capability_id"] == "command-review")
         by_kind = {entry["provider_kinds"][0]: entry for entry in global_command["specifics"]}
         check("codex" in by_kind, "Codex custom prompt appears as global command")
+        check(by_kind["codex"]["label"] == "Codex custom prompt", "Codex prompt label is provider-specific")
     finally:
         shutil.rmtree(wipe)
 
