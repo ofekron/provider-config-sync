@@ -195,7 +195,7 @@ def create_server() -> FastMCP:
     async def create_provider_config_capability(
         scope: str,
         category: str,
-        provider_kind: str,
+        provider_kinds: list[str],
         name: str,
         description: str = "",
         instructions: str = "",
@@ -208,7 +208,7 @@ def create_server() -> FastMCP:
                     cwd=cwd,
                     scope=scope,
                     category=category,
-                    provider_kind=provider_kind,
+                    provider_kinds=provider_kinds,
                     name=name,
                     description=description,
                     instructions=instructions,

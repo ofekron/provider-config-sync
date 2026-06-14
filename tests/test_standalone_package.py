@@ -384,7 +384,7 @@ def t_create_capability_adds_provider_native_seed() -> None:
                     cwd=str(project),
                     scope="project",
                     category="command",
-                    provider_kind="claude",
+                    provider_kinds=["claude", "gemini", "codex"],
                     name="ship",
                     description="Ship changes",
                     instructions="Review, test, and ship.",
@@ -394,11 +394,18 @@ def t_create_capability_adds_provider_native_seed() -> None:
         )
         check(result["capability"]["capability_id"] == "command-ship", "create capability returns rediscovered capability")
         created = project / ".claude" / "commands" / "ship.md"
-        check(created.is_file(), "create capability writes provider-native seed file")
+        gemini = project / ".gemini" / "commands" / "ship.toml"
+        codex = project / ".agents" / "skills" / "command-ship" / "SKILL.md"
+        unified = Path(result["capability"]["unified"]["path"])
+        check(unified.is_file(), "create capability writes unified seed file")
+        check(created.is_file(), "create capability writes Claude provider-native seed file")
+        check(gemini.is_file(), "create capability writes Gemini provider-native seed file")
+        check(codex.is_file(), "create capability writes Codex provider-native seed file")
         payload = api._discover(str(project))
         command = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "command-ship")
         by_kind = {entry["provider_kinds"][0]: entry for entry in command["specifics"]}
         check(set(by_kind) == {"claude", "codex", "gemini"}, "created capability discovers all provider targets")
+        check(json.loads(command["unified"]["content"])["instructions"] == "Review, test, and ship.\n", "create capability seeds unified")
         check(json.loads(by_kind["claude"]["content"])["metadata"]["allowed-tools"] == "Read, Bash", "create capability preserves metadata")
     finally:
         shutil.rmtree(wipe)

@@ -171,6 +171,23 @@ def goose_app_html() -> str:
     .create-grid .wide { grid-column: span 2; }
     .create-grid .full { grid-column: 1 / -1; }
     .create-grid textarea { min-height: 92px; }
+    .provider-checks {
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(8, 13, 24, .35);
+    }
+    .provider-checks label {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .provider-checks input { width: auto; margin: 0; }
     .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
     .panel-head {
       display: flex;
@@ -379,8 +396,8 @@ def goose_app_html() -> str:
                 </select>
               </div>
               <div>
-                <label for="newProvider">Provider</label>
-                <select id="newProvider"></select>
+                <label>Providers</label>
+                <div class="provider-checks" id="newProviders"></div>
               </div>
               <div>
                 <button class="primary" id="createCapability">Add</button>
@@ -682,15 +699,20 @@ def goose_app_html() -> str:
 
     function renderProviders() {
       const providers = (state.payload && state.payload.providers) || [];
-      const current = $("newProvider").value;
-      $("newProvider").innerHTML = "";
+      const selected = new Set([...$("newProviders").querySelectorAll("input:checked")].map(input => input.value));
+      $("newProviders").innerHTML = "";
       for (const provider of providers) {
-        const option = document.createElement("option");
-        option.value = provider.kind;
-        option.textContent = provider.name + " (" + provider.kind + ")";
-        $("newProvider").appendChild(option);
+        const label = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = provider.kind;
+        input.checked = selected.size === 0 || selected.has(provider.kind);
+        const text = document.createElement("span");
+        text.textContent = provider.name + " (" + provider.kind + ")";
+        label.appendChild(input);
+        label.appendChild(text);
+        $("newProviders").appendChild(label);
       }
-      if (providers.some(provider => provider.kind === current)) $("newProvider").value = current;
     }
 
     function renderCapability() {
@@ -855,7 +877,7 @@ def goose_app_html() -> str:
           cwd: state.cwd,
           scope: $("newScope").value,
           category: $("newCategory").value,
-          provider_kind: $("newProvider").value,
+          provider_kinds: [...$("newProviders").querySelectorAll("input:checked")].map(input => input.value),
           name: $("newName").value.trim(),
           description: $("newDescription").value,
           instructions: $("newInstructions").value,
