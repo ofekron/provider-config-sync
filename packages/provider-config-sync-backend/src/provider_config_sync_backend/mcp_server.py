@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent
 
 from . import api
+from .automation import _capability_worklist, _config_path, _projects
 from .goose_app import GOOSE_APP_MIME_TYPE, GOOSE_APP_URI, goose_app_html
 from .standalone import configure_from_file
 
@@ -69,6 +70,15 @@ def create_server() -> FastMCP:
             structuredContent={"cwd": cwd},
             meta={"ui": {"resourceUri": GOOSE_APP_URI}},
         )
+
+    @server.tool()
+    def list_provider_config_worklist() -> dict[str, Any]:
+        try:
+            config_path = _config_path(None)
+            projects = _projects(config_path)
+            return {"worklist": _capability_worklist(projects, config_path)}
+        except HTTPException as error:
+            raise _error(error) from error
 
     @server.tool()
     def list_provider_config_capabilities(cwd: str = "") -> dict[str, Any]:

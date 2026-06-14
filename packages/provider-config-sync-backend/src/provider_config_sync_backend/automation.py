@@ -10,10 +10,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .standalone import _read_config
+from . import api
+from .standalone import _read_config, configure_from_file
 
 _SERVER_NAME = "provider_config_sync"
 _SYNC_TOOLS = [
+    "list_provider_config_worklist",
     "list_provider_config_capabilities",
     "read_provider_config_entry",
     "write_provider_config_entry",
@@ -64,17 +66,63 @@ def _projects(config_path: Path | None) -> list[str]:
     return sorted(set(paths))
 
 
+def _capability_status(capability: dict[str, Any]) -> str:
+    if capability.get("missing_count"):
+        return "missing"
+    if capability.get("has_diffs"):
+        return "diff"
+    return "aligned"
+
+
+def _capability_worklist(projects: list[str], config_path: Path | None) -> list[dict[str, Any]]:
+    configure_from_file(config_path)
+    scopes = [("", "global")]
+    scopes.extend((project, project) for project in projects)
+    worklist: list[dict[str, Any]] = []
+    for cwd, label in scopes:
+        payload = api._discover(cwd)
+        capabilities = []
+        for capability in payload["capabilities"]:
+            status = _capability_status(capability)
+            if status == "aligned":
+                continue
+            specifics = []
+            for entry in capability["specifics"]:
+                entry_status = "missing" if not entry["exists"] else ("aligned" if entry["content"] == capability["unified"]["content"] else "diff")
+                if entry_status == "aligned":
+                    continue
+                specifics.append(
+                    {
+                        "entry_id": entry["entry_id"],
+                        "providers": entry["provider_names"],
+                        "exists": entry["exists"],
+                        "writable": entry["writable"],
+                        "status": entry_status,
+                    }
+                )
+            capabilities.append(
+                {
+                    "id": capability["capability_id"],
+                    "name": capability["name"],
+                    "scope": capability["scope"],
+                    "category": capability["category"],
+                    "status": status,
+                    "unified_entry_id": capability["unified"]["entry_id"],
+                    "specifics": specifics,
+                }
+            )
+        worklist.append({"cwd": cwd, "label": label, "capabilities": capabilities})
+    return worklist
+
+
 def _automation_prompt(projects: list[str], user_prompt: str) -> str:
-    scopes = ['global config: call list_provider_config_capabilities with cwd=""']
-    scopes.extend(f"project config: {project}" for project in projects)
     extra = f"\n\nUser request:\n{user_prompt.strip()}" if user_prompt.strip() else ""
     return (
         "Use the Provider Config Sync MCP tools to automatically reconcile known agent provider configs.\n\n"
-        "Scope:\n"
-        + "\n".join(f"- {scope}" for scope in scopes)
-        + "\n\n"
-        "For every scope, list provider config capabilities, inspect entries with diffs or missing provider files, "
-        "choose the best source content, update the unified capability first, then apply it to every provider-specific "
+        "First call list_provider_config_worklist once. Do not enumerate projects or capabilities yourself. "
+        "Use that returned worklist as the complete reconciliation plan for global config and configured projects.\n\n"
+        "For each listed capability with status diff or missing, inspect the listed entries, choose the best source "
+        "content, update the unified capability first, then apply it to every provider-specific "
         "target that has an equivalent native config. Preserve provider-specific extensions when they are not equivalent "
         "common fields. Do not edit unrelated files. Use expected_content, expected_source, and expected_target from the "
         "latest reads before every write/apply. Report what changed and what was already aligned."

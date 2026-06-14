@@ -23,7 +23,7 @@ if str(_PACKAGE_SRC) not in sys.path:
 
 from provider_config_sync_backend import api  # noqa: E402
 from provider_config_sync_backend.agent_integrations import install_agent_integrations  # noqa: E402
-from provider_config_sync_backend.automation import _automation_prompt, _build_command, _projects  # noqa: E402
+from provider_config_sync_backend.automation import _automation_prompt, _build_command, _capability_worklist, _projects  # noqa: E402
 from provider_config_sync_backend.mcp_server import create_server  # noqa: E402
 from provider_config_sync_backend.standalone import create_app  # noqa: E402
 
@@ -142,6 +142,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check(
         {
             "open_provider_config_sync_gui",
+            "list_provider_config_worklist",
             "list_provider_config_capabilities",
             "read_provider_config_entry",
             "write_provider_config_entry",
@@ -208,8 +209,13 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
             + "\n",
             encoding="utf-8",
         )
-        prompt = _automation_prompt(_projects(config_path), "Prefer shortest shared config.")
-        check(str(project) in prompt and 'cwd=""' in prompt, "automation prompt covers project and global scopes")
+        projects = _projects(config_path)
+        worklist = _capability_worklist(projects, config_path)
+        prompt = _automation_prompt(projects, "Prefer shortest shared config.")
+        check("list_provider_config_worklist" in prompt, "automation prompt uses the worklist tool")
+        check("Do not enumerate projects or capabilities yourself" in prompt, "automation prompt forbids agent-side enumeration")
+        check(str(project) not in prompt and '"cwd": ""' not in prompt, "automation prompt does not embed the worklist")
+        check(any(item["capabilities"] for item in worklist), "worklist tool code enumerates actionable capabilities")
         for provider in ("claude", "codex", "gemini"):
             temp = wipe / provider
             temp.mkdir()
