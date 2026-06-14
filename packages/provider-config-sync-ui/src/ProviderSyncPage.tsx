@@ -934,13 +934,13 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                           unifiedDirty={isDirty(unified)}
                           specificDirty={isDirty(selectedSpecific)}
                           onUnifiedChange={(lineNumber, fallbackIndex, content) => {
-                            updateAndSaveFile(
+                            updateDraft(
                               unified,
                               replaceLine(draftFor(unified), lineNumber, fallbackIndex, content),
                             );
                           }}
                           onSpecificChange={(lineNumber, fallbackIndex, content) => {
-                            updateAndSaveFile(
+                            updateDraft(
                               selectedSpecific,
                               replaceLine(draftFor(selectedSpecific), lineNumber, fallbackIndex, content),
                             );
@@ -1360,6 +1360,9 @@ function EditableDiffCell({
   useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
+    if (document.activeElement !== editor && editor.value !== text) {
+      editor.value = text;
+    }
     resizeEditor(editor);
   }, [resizeEditor, text]);
 
@@ -1392,6 +1395,12 @@ function diffCellTone(row: AlignedDiffRow, side: "left" | "right"): "same" | "ch
 function diffCellClassName(row: AlignedDiffRow, side: "left" | "right"): string {
   const tone = diffCellTone(row, side);
   return `provider-sync-diff-cell provider-sync-diff-cell-${side} ${tone}`;
+}
+
+function editableDiffRowKey(row: AlignedDiffRow, fallbackIndex: number): string {
+  const unifiedKey = row.unifiedLine === null ? `u-new-${fallbackIndex}` : `u-${row.unifiedLine}`;
+  const specificKey = row.specificLine === null ? `s-new-${fallbackIndex}` : `s-${row.specificLine}`;
+  return `${unifiedKey}:${specificKey}`;
 }
 
 function diffCounts(rows: AlignedDiffRow[]) {
@@ -1636,10 +1645,11 @@ function AlignedDiffView({
         {rows.map((row, index) => {
           const hunk = hunkByFirstRow.get(row.key);
           const changed = row.kind !== "same";
+          const renderKey = editable ? editableDiffRowKey(row, index) : row.key;
           return (
             <div
               className={`provider-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`}
-              key={row.key}
+              key={renderKey}
               ref={(node) => {
                 if (changed) registerDiffRow(row.key, node);
               }}

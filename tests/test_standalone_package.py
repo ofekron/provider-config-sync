@@ -192,6 +192,18 @@ def t_file_actions_live_in_diff_header() -> None:
     check("provider-sync-aligned-diff-header-actions" in styles, "diff header action slots are styled")
 
 
+def t_diff_text_edits_preserve_focus() -> None:
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    unified_change = page.split("onUnifiedChange={(lineNumber, fallbackIndex, content) => {", 1)[1].split("}}", 1)[0]
+    specific_change = page.split("onSpecificChange={(lineNumber, fallbackIndex, content) => {", 1)[1].split("}}", 1)[0]
+    check("updateDraft(" in unified_change, "unified text edits update draft state")
+    check("updateAndSaveFile(" not in unified_change, "unified text edits do not save/refetch on each keystroke")
+    check("updateDraft(" in specific_change, "specific text edits update draft state")
+    check("updateAndSaveFile(" not in specific_change, "specific text edits do not save/refetch on each keystroke")
+    check("document.activeElement !== editor" in page, "focused diff editor is not overwritten from props")
+    check("editableDiffRowKey" in page, "editable diff rows use stable render keys")
+
+
 def t_mcp_server_exposes_sync_tools() -> None:
     server = create_server()
     tools = asyncio.run(server.list_tools())
@@ -760,6 +772,7 @@ def main() -> int:
     t_diff_line_editors_hide_textarea_chrome()
     t_diff_views_use_natural_height_without_internal_scrolling()
     t_file_actions_live_in_diff_header()
+    t_diff_text_edits_preserve_focus()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
