@@ -2117,6 +2117,45 @@ def _write_entry_if_unchanged(entry: dict, expected: str | None, content: str) -
     _content_adapter(content_kind).write_if_unchanged(path, expected, content, entry["category"])
 
 
+def _restore_entry_backup_if_unchanged(entry: dict, expected: str | None) -> None:
+    current, exists = _read_entry_current(entry)
+    if _expected_content(current, exists) != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before restoring")
+    real = _real_existing_file(Path(entry["path"]))
+    if real is None:
+        raise HTTPException(status_code=409, detail="file disappeared; refresh before restoring")
+    backup = _backup_path(real)
+    marker = _backup_marker_path(backup)
+    if not _backup_exists(real):
+        raise HTTPException(status_code=404, detail="backup does not exist")
+    backup_content = backup.read_bytes()
+    if hashlib.sha256(backup_content).hexdigest().encode("ascii") != marker.read_bytes():
+        raise HTTPException(status_code=500, detail=f"backup integrity check failed: {backup}")
+    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(real, flags)
+    except OSError as e:
+        raise HTTPException(status_code=409, detail=f"file changed or became unsafe: {e}")
+    with os.fdopen(fd, "r+b") as fh:
+        opened_stat = os.fstat(fh.fileno())
+        try:
+            path_stat = real.stat(follow_symlinks=False)
+        except OSError as e:
+            raise HTTPException(status_code=409, detail=f"file changed: {e}")
+        if (
+            not stat.S_ISREG(path_stat.st_mode)
+            or opened_stat.st_dev != path_stat.st_dev
+            or opened_stat.st_ino != path_stat.st_ino
+            or opened_stat.st_nlink != 1
+        ):
+            raise HTTPException(status_code=409, detail="file changed; refresh before restoring")
+        fh.seek(0)
+        fh.write(backup_content)
+        fh.truncate()
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 async def _broadcast_changed(scope: str, category: str, capability_id: str, path: str, cwd: str) -> None:
     result = _broadcast_changed_source(scope, category, capability_id, path, cwd)
     if hasattr(result, "__await__"):
@@ -2136,6 +2175,13 @@ class WriteNativeFileRequest(BaseModel):
     content: str
 
 
+class RestoreNativeFileRequest(BaseModel):
+    cwd: str = ""
+    entry_id: str | None = None
+    path: str | None = None
+    expected_content: str | None = None
+
+
 @router.put("/file")
 async def write_native_file(req: WriteNativeFileRequest):
     entries = _entry_map(req.cwd)
@@ -2150,6 +2196,21 @@ async def write_native_file(req: WriteNativeFileRequest):
         if _expected_content(current, exists) != req.expected_content:
             raise HTTPException(status_code=409, detail="file changed; refresh before saving")
         _write_entry_if_unchanged(entry, req.expected_content, req.content)
+    await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    return {"ok": True, "path": entry["path"]}
+
+
+@router.post("/file/restore")
+async def restore_native_file(req: RestoreNativeFileRequest):
+    entries = _entry_map(req.cwd)
+    entry_key = req.entry_id or req.path
+    if entry_key is None:
+        raise HTTPException(status_code=400, detail="entry_id is required")
+    entry = entries.get(entry_key)
+    if entry is None or not entry.get("writable"):
+        raise HTTPException(status_code=400, detail="entry is not an editable sync file")
+    with _lock:
+        _restore_entry_backup_if_unchanged(entry, req.expected_content)
     await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
     return {"ok": True, "path": entry["path"]}
 
