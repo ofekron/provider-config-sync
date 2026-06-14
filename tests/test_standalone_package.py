@@ -152,6 +152,30 @@ def t_diff_line_editors_hide_textarea_chrome() -> None:
     )
 
 
+def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
+    styles = _UI_STYLES.read_text(encoding="utf-8")
+    for selector in (
+        ".provider-sync-main",
+        ".provider-sync-editor-card",
+        ".provider-sync-structured",
+        ".provider-sync-aligned-diff",
+        ".provider-sync-aligned-diff-body",
+        ".provider-sync-specifics-card",
+        ".provider-sync-specifics",
+    ):
+        rule = styles.split(f"{selector} {{", 1)[1].split("}", 1)[0]
+        check("overflow: visible;" in rule, f"{selector} does not create an internal scroll view")
+
+    shell_rule = styles.split(".provider-sync-shell {", 1)[1].split("}", 1)[0]
+    editor_grid_rule = styles.split(".provider-sync-editor-grid {", 1)[1].split("}", 1)[0]
+    diff_body_rule = styles.split(".provider-sync-aligned-diff-body {", 1)[1].split("}", 1)[0]
+    specifics_rule = styles.split(".provider-sync-specifics {", 1)[1].split("}", 1)[0]
+    check("flex: 1 0 auto;" in shell_rule, "shell can grow past the viewport")
+    check("flex: 0 0 auto;" in editor_grid_rule, "editor grid uses content height")
+    check("flex: 0 0 auto;" in diff_body_rule, "diff body uses content height")
+    check("flex: 0 0 auto;" in specifics_rule, "specifics view uses content height")
+
+
 def t_mcp_server_exposes_sync_tools() -> None:
     server = create_server()
     tools = asyncio.run(server.list_tools())
@@ -648,6 +672,7 @@ def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
     t_diff_line_editors_hide_textarea_chrome()
+    t_diff_views_use_natural_height_without_internal_scrolling()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()

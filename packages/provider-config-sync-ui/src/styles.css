@@ -69,6 +69,7 @@
   z-index: 2600;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   background: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -112,7 +113,7 @@
 
 .provider-sync-shell {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   display: grid;
   grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
 }
@@ -424,7 +425,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .provider-sync-error {
@@ -446,7 +447,7 @@
 
 .provider-sync-editor-grid {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
   gap: 12px;
@@ -463,7 +464,7 @@
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-secondary);
 }
 
@@ -500,11 +501,11 @@
 
 .provider-sync-structured {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow: auto;
+  overflow: visible;
   padding: 10px;
 }
 
@@ -622,7 +623,7 @@
 .provider-sync-aligned-diff {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-primary);
@@ -739,8 +740,8 @@
 
 .provider-sync-aligned-diff-body {
   min-height: 0;
-  flex: 1 1 auto;
-  overflow: auto;
+  flex: 0 0 auto;
+  overflow: visible;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
@@ -876,15 +877,15 @@
 }
 
 .provider-sync-specifics-card {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .provider-sync-specifics {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: visible;
   padding: 10px;
 }
 
