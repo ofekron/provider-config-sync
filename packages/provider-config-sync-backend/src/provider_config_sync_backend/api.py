@@ -2301,6 +2301,13 @@ class RestoreNativeFileRequest(BaseModel):
     expected_content: str | None = None
 
 
+class DeleteCapabilityRequest(BaseModel):
+    cwd: str = ""
+    scope: str | None = None
+    capability_id: str
+    expected_contents: dict[str, str | None]
+
+
 @router.put("/file")
 async def write_native_file(req: WriteNativeFileRequest):
     entries = _entry_map(req.cwd)
@@ -2317,6 +2324,99 @@ async def write_native_file(req: WriteNativeFileRequest):
         _write_entry_if_unchanged(entry, req.expected_content, req.content)
     await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
     return {"ok": True, "path": entry["path"]}
+
+
+def _delete_file_if_unchanged(path: Path, expected: str | None, current: str) -> bool:
+    if expected is None:
+        return False
+    if path.is_symlink():
+        raise HTTPException(status_code=400, detail=f"refusing to delete symlinked path: {path}")
+    real = _real_existing_file(path)
+    if real is None:
+        raise HTTPException(status_code=409, detail="file disappeared; refresh before deleting")
+    if real != path.resolve(strict=True):
+        raise HTTPException(status_code=400, detail=f"refusing to delete indirect path: {path}")
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+    _create_backup_once(real, current.encode("utf-8"))
+    try:
+        real.unlink()
+    except OSError as e:
+        raise HTTPException(status_code=409, detail=f"file changed or could not be deleted: {e}")
+    return True
+
+
+def _delete_json_mcp_if_unchanged(path: Path, expected: str | None) -> bool:
+    if expected is None:
+        return False
+    original = _read_existing_text(path)
+    data = _json_object_from_text(path, original) if original is not None else {}
+    if "mcpServers" not in data:
+        raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+    current = _mcp_fragment_from_servers(path, data["mcpServers"])
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+    data.pop("mcpServers", None)
+    _write_if_unchanged(path, original, json.dumps(data, indent=2, sort_keys=True) + "\n", "config")
+    return True
+
+
+def _delete_toml_mcp_if_unchanged(path: Path, expected: str | None) -> bool:
+    if expected is None:
+        return False
+    original = _read_existing_text(path)
+    data = _toml_object_from_text(path, original) if original is not None else {}
+    if "mcp_servers" not in data:
+        raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+    current = _mcp_fragment_from_servers(path, data["mcp_servers"])
+    if current != expected:
+        raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+    data.pop("mcp_servers", None)
+    _write_if_unchanged(path, original, _toml_dumps(data), "config")
+    return True
+
+
+def _delete_entry_if_unchanged(entry: dict, expected: str | None) -> bool:
+    current, exists = _read_entry_current(entry)
+    if not exists:
+        if expected is not None:
+            raise HTTPException(status_code=409, detail="file disappeared; refresh before deleting")
+        return False
+    content_kind = entry.get("content_kind") or _CONTENT_FILE
+    path = Path(entry["path"])
+    if content_kind == _CONTENT_JSON_MCP:
+        return _delete_json_mcp_if_unchanged(path, expected)
+    if content_kind == _CONTENT_TOML_MCP:
+        return _delete_toml_mcp_if_unchanged(path, expected)
+    return _delete_file_if_unchanged(path, expected, current)
+
+
+async def delete_capability(req: DeleteCapabilityRequest):
+    capability = _capability_for_tool(req.cwd, req.capability_id, req.scope)
+    entries = [capability["unified"], *capability["specifics"]]
+    deleted_paths: list[str] = []
+    with _lock:
+        latest = _capability_for_tool(req.cwd, req.capability_id, req.scope)
+        latest_entries = [latest["unified"], *latest["specifics"]]
+        for entry in latest_entries:
+            if entry["entry_id"] not in req.expected_contents:
+                raise HTTPException(status_code=400, detail="expected content missing for capability entry")
+            expected = req.expected_contents[entry["entry_id"]]
+            current, exists = _read_entry_current(entry)
+            if _expected_content(current, exists) != expected:
+                raise HTTPException(status_code=409, detail="file changed; refresh before deleting")
+        for entry in latest_entries:
+            if _delete_entry_if_unchanged(entry, req.expected_contents[entry["entry_id"]]):
+                deleted_paths.append(entry["path"])
+    for entry in entries:
+        if entry["path"] in deleted_paths:
+            await _broadcast_changed(entry["scope"], entry["category"], entry["capability_id"], entry["path"], req.cwd)
+    return {"ok": True, "capability_id": capability["capability_id"], "deleted_paths": deleted_paths}
+
+
+@router.delete("/capability")
+async def delete_capability_route(req: DeleteCapabilityRequest):
+    return await delete_capability(req)
 
 
 @router.post("/file/restore")
