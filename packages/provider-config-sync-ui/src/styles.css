@@ -649,10 +649,6 @@
   align-items: center;
 }
 
-.provider-sync-aligned-diff-header-side:last-child {
-  text-align: right;
-}
-
 .provider-sync-aligned-diff-header-side div {
   min-width: 0;
   display: grid;
@@ -671,6 +667,12 @@
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 500;
+}
+
+.provider-sync-aligned-diff-header-side span {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .provider-sync-aligned-diff-header-side button {

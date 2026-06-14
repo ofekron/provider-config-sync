@@ -1403,14 +1403,16 @@ function DiffHeaderSide({
         <span>{label}</span>
         {path && <small>{path}</small>}
       </div>
-      <button
-        type="button"
-        className="btn-secondary"
-        disabled={busy || !dirty || !writable}
-        onClick={onSave}
-      >
-        {dirty ? `Save ${label}` : "Saved"}
-      </button>
+      {dirty && (
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={busy || !writable}
+          onClick={onSave}
+        >
+          Save {label}
+        </button>
+      )}
     </div>
   );
 }
