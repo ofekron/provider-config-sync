@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build:core": "npm --prefix packages/provider-config-sync-core run build",
-    "build:ui": "npm --prefix packages/provider-config-sync-ui run build"
+    "build:ui": "npm --prefix packages/provider-config-sync-ui run build",
+    "build:mcp-ui": "npm --prefix packages/provider-config-sync-ui run build:mcp"
   }
 }

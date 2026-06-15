@@ -230,13 +230,19 @@ def t_mcp_server_exposes_sync_tools() -> None:
     check(
         {
             "open_provider_config_sync_gui",
+            "list_provider_config_projects",
+            "get_provider_config_state",
             "list_provider_config_worklist",
             "list_provider_config_capabilities",
             "read_provider_config_entry",
+            "update_provider_config_auto_settings",
             "write_provider_config_entry",
+            "restore_provider_config_entry",
+            "delete_provider_config_capability",
             "apply_provider_config_entry",
             "auto_sync_provider_config_entry",
             "create_provider_config_capability",
+            "transfer_provider_config_capability",
             "upsert_unified_capability_item",
             "remove_unified_capability_item",
         }.issubset(names),
@@ -251,17 +257,13 @@ def t_mcp_server_exposes_sync_tools() -> None:
     resource = next(item for item in resources if str(item.uri) == "ui://provider-config-sync/main")
     check(resource.mimeType == "text/html;profile=mcp-app", "MCP App resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
-    check("tools/call" in content.content, "MCP App can call provider config sync tools")
-    check("create_provider_config_capability" in content.content, "MCP App can create capabilities")
-    check('id="createCapability"' in content.content, "MCP App exposes add capability controls")
-    check("collapsedGroups" in content.content and "cap-group-head" in content.content, "MCP App can collapse capability groups")
-    check("auto_sync_provider_config_entry" in content.content, "MCP App can auto-merge with configured AI review")
-    check("<span>Unified</span>" in content.content and "<span>Specific</span>" in content.content, "MCP App always labels unified and specific diff panes")
-    check("Unified is missing" in content.content and "Specific is missing" in content.content, "MCP App keeps empty diff panes visible")
-    check("Save source before applying" in content.content, "MCP App blocks apply while source edits are unsaved")
-    check('"reset").onclick = () => { $("content").value = state.original;' in content.content, "MCP App reset restores apply buttons")
-    check("@media (max-width: 760px)" in content.content and "overflow-x: auto" in content.content, "MCP App has mobile layout rules")
-    check('window.addEventListener("resize", () => app.resize())' in content.content, "MCP App notifies host after viewport changes")
+    check("ProviderSyncPage" in content.content, "MCP App serves the shared React provider sync page")
+    check("provider-sync-page" in content.content, "MCP App embeds shared provider sync styles")
+    check("McpHostBridge" in content.content and "tools/call" in content.content, "MCP App adapts React client calls to MCP tools")
+    check("create_provider_config_capability" in content.content, "MCP App can create capabilities through MCP")
+    check("transfer_provider_config_capability" in content.content, "MCP App can transfer capabilities through MCP")
+    check("@media (max-width: 900px)" in content.content, "MCP App keeps shared responsive layout rules")
+    check("ui/notifications/size-changed" in content.content, "MCP App notifies host after layout changes")
     result = asyncio.run(server.call_tool("open_provider_config_sync_gui", {"cwd": "/repo"}))
     check(result.structuredContent["cwd"] == "/repo", "MCP App tool returns requested project path")
 

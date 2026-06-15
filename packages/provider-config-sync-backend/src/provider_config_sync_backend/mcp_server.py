@@ -72,6 +72,20 @@ def create_server() -> FastMCP:
         )
 
     @server.tool()
+    async def list_provider_config_projects() -> dict[str, Any]:
+        try:
+            return await api.list_provider_sync_projects()
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    def get_provider_config_state(cwd: str = "") -> dict[str, Any]:
+        try:
+            return api._discover(cwd)
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
     def list_provider_config_worklist() -> dict[str, Any]:
         try:
             config_path = _config_path(None)
@@ -121,6 +135,25 @@ def create_server() -> FastMCP:
             raise _error(error) from error
 
     @server.tool()
+    async def update_provider_config_auto_settings(
+        level: str,
+        policy: dict[str, str],
+        cwd: str = "",
+        capability_id: str = "",
+    ) -> dict[str, Any]:
+        try:
+            return api.update_auto_sync_settings(
+                api.AutoSyncSettingsPatch(
+                    level=level,
+                    cwd=cwd,
+                    capability_id=capability_id,
+                    policy=policy,
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
     async def write_provider_config_entry(
         content: str,
         expected_content: str | None,
@@ -136,6 +169,44 @@ def create_server() -> FastMCP:
                     path=path,
                     expected_content=expected_content,
                     content=content,
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def restore_provider_config_entry(
+        expected_content: str | None,
+        cwd: str = "",
+        entry_id: str | None = None,
+        path: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return await api.restore_native_file(
+                api.RestoreNativeFileRequest(
+                    cwd=cwd,
+                    entry_id=entry_id,
+                    path=path,
+                    expected_content=expected_content,
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def delete_provider_config_capability(
+        expected_contents: dict[str, str | None],
+        cwd: str = "",
+        scope: str | None = None,
+        capability_id: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return await api.delete_capability(
+                api.DeleteCapabilityRequest(
+                    cwd=cwd,
+                    scope=scope,
+                    capability_id=capability_id,
+                    expected_contents=expected_contents,
                 )
             )
         except HTTPException as error:
@@ -213,6 +284,31 @@ def create_server() -> FastMCP:
                     description=description,
                     instructions=instructions,
                     metadata=metadata or {},
+                )
+            )
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
+    async def transfer_provider_config_capability(
+        scope: str,
+        capability_id: str,
+        target_scope: str,
+        mode: str,
+        expected_contents: dict[str, str | None],
+        cwd: str = "",
+        target_cwd: str = "",
+    ) -> dict[str, Any]:
+        try:
+            return await api.transfer_capability(
+                api.TransferCapabilityRequest(
+                    cwd=cwd,
+                    scope=scope,
+                    capability_id=capability_id,
+                    target_cwd=target_cwd,
+                    target_scope=target_scope,
+                    mode=mode,
+                    expected_contents=expected_contents,
                 )
             )
         except HTTPException as error:
