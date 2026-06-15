@@ -180,3 +180,16 @@ export interface ProviderSyncAutoResponse {
   skipped_count: number;
   log_head: ProviderSyncAutoLogItem[];
 }
+
+export interface ProviderSyncCapabilityPickerSource {
+  source_id: string;
+  source_scope: ProviderSyncScope;
+  source_cwd: string;
+  source_label: string;
+  capability: ProviderSyncCapability;
+  preferred_entry: ProviderSyncFile | null;
+}
+
+export interface ProviderSyncCapabilityPickerResponse {
+  sources: ProviderSyncCapabilityPickerSource[];
+}

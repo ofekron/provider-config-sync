@@ -26549,7 +26549,8 @@
       createCapability: (body) => host2.callTool("create_provider_config_capability", body),
       transferCapability: (body) => host2.callTool("transfer_provider_config_capability", body),
       apply: (body) => host2.callTool("apply_provider_config_entry", body).then(() => void 0),
-      autoSync: (body) => host2.callTool("auto_sync_provider_config_entry", body)
+      autoSync: (body) => host2.callTool("auto_sync_provider_config_entry", body),
+      listCapabilityPickerSources: (cwd) => host2.callTool("list_provider_config_capability_picker", { cwd })
     };
   }
   function McpProviderSyncApp({ host: host2 }) {

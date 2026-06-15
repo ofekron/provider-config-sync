@@ -86,6 +86,13 @@ def create_server() -> FastMCP:
             raise _error(error) from error
 
     @server.tool()
+    def list_provider_config_capability_picker(cwd: str = "") -> dict[str, Any]:
+        try:
+            return api.list_capability_picker_sources(cwd)
+        except HTTPException as error:
+            raise _error(error) from error
+
+    @server.tool()
     def list_provider_config_worklist() -> dict[str, Any]:
         try:
             config_path = _config_path(None)

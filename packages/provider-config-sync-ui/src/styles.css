@@ -1235,6 +1235,83 @@
   text-align: center;
 }
 
+.provider-capability-picker {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.provider-capability-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-capability-picker-head h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.provider-capability-picker-head span,
+.provider-capability-picker-item small,
+.provider-capability-picker-item em {
+  color: var(--text-secondary);
+  font-style: normal;
+}
+
+.provider-capability-picker-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 190px);
+  gap: 10px;
+}
+
+.provider-capability-picker-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+}
+
+.provider-capability-picker-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 220px);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-capability-picker-item:hover {
+  border-color: var(--accent);
+}
+
+.provider-capability-picker-item span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.provider-capability-picker-item strong,
+.provider-capability-picker-item small,
+.provider-capability-picker-item em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .provider-sync-settings-head {
     display: grid;
@@ -1350,6 +1427,11 @@
     display: grid;
     gap: 2px;
     align-content: start;
+  }
+
+  .provider-capability-picker-toolbar,
+  .provider-capability-picker-item {
+    grid-template-columns: 1fr;
   }
 
   .provider-sync-main {

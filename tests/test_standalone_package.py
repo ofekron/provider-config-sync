@@ -156,6 +156,44 @@ def t_ui_client_keeps_better_claude_routes_explicit() -> None:
     check("createBetterClaudeProviderSyncClient" in client, "Better Claude adapter has a named factory")
 
 
+def t_capability_picker_lists_global_and_known_project_sources() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-picker-"))
+    try:
+        project_a = (wipe / "project-a").resolve()
+        project_b = (wipe / "project-b").resolve()
+        project_a.mkdir()
+        project_b.mkdir()
+        claude_home = wipe / "claude"
+        claude_home.mkdir()
+        (claude_home / "CLAUDE.md").write_text("global instructions\n", encoding="utf-8")
+        (project_a / "CLAUDE.md").write_text("project a instructions\n", encoding="utf-8")
+        command = project_b / ".claude" / "commands" / "deploy.md"
+        command.parent.mkdir(parents=True)
+        command.write_text("---\ndescription: Deploy\n---\nDeploy it.\n", encoding="utf-8")
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(claude_home)}
+            ],
+            project_records=lambda: [
+                {"path": str(project_a), "node_id": "primary"},
+                {"path": str(project_b), "node_id": "primary"},
+            ],
+            sync_home=lambda: wipe / "sync-home",
+            broadcast_changed=_noop,
+        )
+
+        sources = api.list_capability_picker_sources(str(project_a))["sources"]
+        keys = {(source["source_scope"], source["source_cwd"], source["capability"]["capability_id"]) for source in sources}
+        check(("global", "", "instructions") in keys, "picker lists global capabilities")
+        check(("project", str(project_a), "instructions") in keys, "picker lists current project capabilities")
+        check(("project", str(project_b), "command-deploy") in keys, "picker lists other known project capabilities")
+        selected = next(source for source in sources if source["source_cwd"] == str(project_a) and source["capability"]["capability_id"] == "instructions")
+        check(selected["preferred_entry"]["content"] == "project a instructions\n", "picker exposes preferred capability content")
+
+    finally:
+        shutil.rmtree(wipe)
+
+
 def t_diff_line_editors_hide_textarea_chrome() -> None:
     page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
     styles = _UI_STYLES.read_text(encoding="utf-8")
@@ -243,6 +281,7 @@ def t_mcp_server_exposes_sync_tools() -> None:
             "open_provider_config_sync_gui",
             "list_provider_config_projects",
             "get_provider_config_state",
+            "list_provider_config_capability_picker",
             "list_provider_config_worklist",
             "list_provider_config_capabilities",
             "read_provider_config_entry",
@@ -879,6 +918,7 @@ def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
     t_ui_client_keeps_better_claude_routes_explicit()
+    t_capability_picker_lists_global_and_known_project_sources()
     t_diff_line_editors_hide_textarea_chrome()
     t_diff_views_use_natural_height_without_internal_scrolling()
     t_file_actions_live_in_diff_header()

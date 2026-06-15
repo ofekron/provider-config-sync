@@ -104,6 +104,8 @@ function createMcpProviderSyncClient(host: McpHostBridge): ProviderSyncApiClient
       host.callTool("apply_provider_config_entry", body as unknown as Record<string, unknown>).then(() => undefined),
     autoSync: (body) =>
       host.callTool("auto_sync_provider_config_entry", body as unknown as Record<string, unknown>),
+    listCapabilityPickerSources: (cwd) =>
+      host.callTool("list_provider_config_capability_picker", { cwd }),
   };
 }
 

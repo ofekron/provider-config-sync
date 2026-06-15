@@ -2383,6 +2383,77 @@ async def list_provider_sync_projects():
     return {"projects": projects}
 
 
+def _picker_source_id(scope: str, source_cwd: str, category: str, capability_id: str) -> str:
+    payload = "\0".join([scope, source_cwd, category, capability_id])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _picker_preferred_entry(capability: dict) -> dict | None:
+    unified = capability.get("unified")
+    if isinstance(unified, dict) and unified.get("exists"):
+        return unified
+    for entry in capability.get("specifics") or []:
+        if isinstance(entry, dict) and entry.get("exists"):
+            return entry
+    return None
+
+
+def _picker_project_cwds(cwd: str = "") -> list[str]:
+    seen: dict[str, None] = {}
+    for project in _project_records_source():
+        if (project.get("node_id") or "primary") != "primary":
+            continue
+        path = project.get("path")
+        if isinstance(path, str) and path:
+            seen[str(_expand_path(path).resolve())] = None
+    if cwd:
+        try:
+            seen[str(_local_project_root(cwd))] = None
+        except HTTPException:
+            pass
+    return list(seen)
+
+
+def _capability_picker_sources(cwd: str = "") -> list[dict]:
+    sources: list[dict] = []
+    global_payload = _discover("")
+    for capability in global_payload["groups"]["global"]:
+        source_cwd = ""
+        sources.append(
+            {
+                "source_id": _picker_source_id("global", source_cwd, capability["category"], capability["capability_id"]),
+                "source_scope": "global",
+                "source_cwd": source_cwd,
+                "source_label": "Global",
+                "capability": capability,
+                "preferred_entry": _picker_preferred_entry(capability),
+            }
+        )
+    for source_cwd in _picker_project_cwds(cwd):
+        payload = _discover(source_cwd)
+        for capability in payload["groups"]["project"]:
+            sources.append(
+                {
+                    "source_id": _picker_source_id("project", source_cwd, capability["category"], capability["capability_id"]),
+                    "source_scope": "project",
+                    "source_cwd": source_cwd,
+                    "source_label": Path(source_cwd).name or source_cwd,
+                    "capability": capability,
+                    "preferred_entry": _picker_preferred_entry(capability),
+                }
+            )
+    return sources
+
+
+def list_capability_picker_sources(cwd: str = "") -> dict:
+    return {"sources": _capability_picker_sources(cwd)}
+
+
+@router.get("/capability-picker")
+async def capability_picker_route(cwd: str = Query("", description="Optional current cwd for picker context")):
+    return list_capability_picker_sources(cwd)
+
+
 class WriteNativeFileRequest(BaseModel):
     cwd: str = ""
     entry_id: str | None = None

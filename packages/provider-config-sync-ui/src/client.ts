@@ -7,6 +7,7 @@ import type {
   ProviderSyncAutoResponse,
   ProviderSyncAutoSettings,
   ProviderSyncAutoSettingsLevel,
+  ProviderSyncCapabilityPickerResponse,
   ProviderSyncCapability,
   ProviderSyncCreateCapabilityRequest,
   ProviderSyncDeleteCapabilityRequest,
@@ -48,6 +49,7 @@ export interface ProviderSyncApiClient {
   transferCapability(body: ProviderSyncTransferCapabilityRequest): Promise<ProviderSyncCreateCapabilityResponse>;
   apply(body: ProviderSyncApplyRequest): Promise<void>;
   autoSync(body: ProviderSyncAutoRequest): Promise<ProviderSyncAutoResponse>;
+  listCapabilityPickerSources(cwd: string): Promise<ProviderSyncCapabilityPickerResponse>;
 }
 
 export interface FetchProviderSyncClientOptions {
@@ -66,6 +68,7 @@ export interface ProviderSyncFetchRoutes {
   transferCapability: string;
   apply: string;
   autoSync: string;
+  capabilityPicker: string;
 }
 
 export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderSyncFetchRoutes = {
@@ -78,6 +81,7 @@ export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderSyncFetchRoutes = {
   transferCapability: "/api/provider-config-sync/capability/transfer",
   apply: "/api/provider-config-sync/apply",
   autoSync: "/api/provider-config-sync/auto-sync",
+  capabilityPicker: "/api/provider-config-sync/capability-picker",
 };
 
 export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES: ProviderSyncFetchRoutes = {
@@ -90,6 +94,7 @@ export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES: ProviderSyncFetchRoutes = {
   transferCapability: "/api/provider-sync/capability/transfer",
   apply: "/api/provider-sync/apply",
   autoSync: "/api/provider-sync/auto-sync",
+  capabilityPicker: "/api/provider-sync/capability-picker",
 };
 
 function pathWithParams(path: string, params: URLSearchParams): string {
@@ -156,6 +161,11 @@ export function createFetchProviderSyncClient(
         method: "POST",
         body: json(body),
       }),
+    listCapabilityPickerSources: (cwd) => {
+      const params = new URLSearchParams();
+      if (cwd) params.set("cwd", cwd);
+      return request<ProviderSyncCapabilityPickerResponse>(pathWithParams(routes.capabilityPicker, params));
+    },
   };
 }
 

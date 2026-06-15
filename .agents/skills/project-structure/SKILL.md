@@ -10,8 +10,8 @@ Provider Config Sync is a small monorepo with TypeScript core/UI packages and a 
 ## Routing
 
 - Core diff/item logic: `packages/provider-config-sync-core/src/`
-- Reusable React UI: `packages/provider-config-sync-ui/src/`
-- Backend API, discovery, sync, auto-sync: `packages/provider-config-sync-backend/src/provider_config_sync_backend/api.py`
+- Reusable React UI and generic capability picker: `packages/provider-config-sync-ui/src/`
+- Backend API, discovery, sync, auto-sync, capability picker: `packages/provider-config-sync-backend/src/provider_config_sync_backend/api.py`
 - MCP App HTML wrapper: `packages/provider-config-sync-backend/src/provider_config_sync_backend/mcp_app.py`
 - Generated React MCP App assets: `packages/provider-config-sync-backend/src/provider_config_sync_backend/static/`
 - MCP server wiring: `packages/provider-config-sync-backend/src/provider_config_sync_backend/mcp_server.py`

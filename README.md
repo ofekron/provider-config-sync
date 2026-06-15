@@ -54,6 +54,9 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
 - **Reusable frontend core**
   Use the TypeScript diff/item helpers in your own UI.
 
+- **Capability picker**
+  Embed a host-neutral picker that lists every known global and project capability so another app can attach or apply the selected capability in its own workflow.
+
 - **Safer writes**
   Writes use expected-content checks, atomic creation, and first-write backups to avoid silent clobbering.
 
@@ -197,6 +200,7 @@ The standalone app mounts:
 
 ```text
 GET    /api/provider-config-sync
+GET    /api/provider-config-sync/capability-picker
 PUT    /api/provider-config-sync/file
 POST   /api/provider-config-sync/apply
 POST   /api/provider-config-sync/unified-capability-item
@@ -204,6 +208,8 @@ DELETE /api/provider-config-sync/unified-capability-item
 ```
 
 Use `GET /api/provider-config-sync?cwd=...` to discover capabilities and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, estimated token counts, diff status, and provider metadata.
+
+Use `GET /api/provider-config-sync/capability-picker?cwd=...` when a host needs to choose a capability from anywhere Provider Config Sync knows about. The response flattens global capabilities plus every configured primary project capability into picker sources, each with the original capability payload and a preferred readable entry. The endpoint is deliberately host-neutral: it does not know about any one application runtime. A host can render the picker, receive the selected source, and decide how that selection applies to its own objects.
 
 ## MCP Tools
 
@@ -241,12 +247,14 @@ Frontend:
 ```ts
 import { buildAlignedDiffRows } from "@better-agent/provider-config-sync-core/diff";
 import { parseMcpServers } from "@better-agent/provider-config-sync-core/items";
+import { ProviderCapabilityPicker } from "@better-agent/provider-config-sync-ui";
 ```
 
 ## Design Principles
 
 - **Native first**: providers keep reading their own files.
 - **Unified is a tracking layer**: it helps compare and propagate equivalent capabilities; it is not a runtime replacement for provider config.
+- **Picker is host-neutral**: Provider Config Sync can enumerate and render capability choices, but the embedding host owns what a selected capability means in its own workflow.
 - **No silent overwrites**: writes require the expected previous content.
 - **Format abstraction, not format erasure**: common fields get a common UI shape, provider-specific metadata survives round trips.
 - **Portable core**: the backend package has no Better Claude dependency.
