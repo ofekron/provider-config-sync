@@ -24681,6 +24681,17 @@
       metadata: root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata) ? stringifyJson(root.metadata).trimEnd() : "{}"
     };
   }
+  function stringifyCommonItemDraft(item) {
+    const metadata = parseJsonObject(item.metadata);
+    if (!metadata)
+      return null;
+    return stringifyJson({
+      name: item.name,
+      description: item.description,
+      instructions: item.instructions,
+      metadata
+    });
+  }
 
   // src/ProviderSyncPage.tsx
   var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
@@ -24708,6 +24719,12 @@
     { id: "skill", label: "Skill" },
     { id: "agent", label: "Subagent" },
     { id: "command", label: "Command" }
+  ];
+  var COMMON_ITEM_FIELDS = [
+    { field: "name", label: "Name" },
+    { field: "description", label: "Description" },
+    { field: "instructions", label: "Instructions" },
+    { field: "metadata", label: "Provider extensions" }
   ];
   var DEFAULT_AUTO_POLICY = {
     additive: "off",
@@ -25602,9 +25619,17 @@
                 selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific: selectedSpecific }) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   StructuredSpecificView,
                   {
+                    busy,
                     capability: selectedCapability,
+                    unified,
+                    specific: { ...selectedSpecific, content: debouncedDraftFor(selectedSpecific) },
                     unifiedContent: debouncedDraftFor(unified),
-                    specific: { ...selectedSpecific, content: debouncedDraftFor(selectedSpecific) }
+                    unifiedDirty: isDirty(unified),
+                    specificDirty: isDirty(selectedSpecific),
+                    onUnifiedContentChange: (content) => updateDraft(unified, content),
+                    onSpecificContentChange: (content) => updateDraft(selectedSpecific, content),
+                    onSaveUnified: () => void saveFile(unified),
+                    onSaveSpecific: () => void saveFile(selectedSpecific)
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableAlignedFileDiff,
@@ -25704,9 +25729,17 @@
     ] });
   }
   function StructuredSpecificView({
+    busy,
     capability,
+    unified,
     unifiedContent,
-    specific
+    specific,
+    unifiedDirty,
+    specificDirty,
+    onUnifiedContentChange,
+    onSpecificContentChange,
+    onSaveUnified,
+    onSaveSpecific
   }) {
     if (!specific.exists) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific });
     if (capability.capability_id === "mcp") {
@@ -25728,21 +25761,23 @@
     if (capability.category === "agent" || capability.category === "skill" || capability.category === "command") {
       const unifiedItem = parseCommonItemDraft(unifiedContent);
       const item = parseCommonItemDraft(specific.content);
-      if (!item) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredParseError, {});
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-structured provider-sync-structured-specific", children: [
-        unifiedItem && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          StructuredFieldDiffs,
-          {
-            fields: [
-              ["Name", unifiedItem.name, item.name],
-              ["Description", unifiedItem.description, item.description],
-              ["Instructions", unifiedItem.instructions, item.instructions],
-              ["Provider extensions", unifiedItem.metadata, item.metadata]
-            ]
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CommonItemFields, { item, readOnly: true })
-      ] });
+      if (!unifiedItem || !item) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredParseError, {});
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured provider-sync-structured-specific", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        StructuredEditableFieldDiffs,
+        {
+          busy,
+          unified,
+          specific,
+          unifiedItem,
+          specificItem: item,
+          unifiedDirty,
+          specificDirty,
+          onUnifiedContentChange,
+          onSpecificContentChange,
+          onSaveUnified,
+          onSaveSpecific
+        }
+      ) });
     }
     return null;
   }
@@ -26343,39 +26378,6 @@
       ] })
     ] });
   }
-  function CommonItemFields({
-    item,
-    readOnly,
-    onChange
-  }) {
-    const set = (patch) => onChange?.({ ...item, ...patch });
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-item-card", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Name" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { value: item.name, onChange: (e) => set({ name: e.target.value }), readOnly })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Description" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { value: item.description, onChange: (e) => set({ description: e.target.value }), readOnly })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Instructions" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "textarea",
-          {
-            className: "provider-sync-large-textarea",
-            value: item.instructions,
-            onChange: (e) => set({ instructions: e.target.value }),
-            readOnly
-          }
-        )
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Provider extensions" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { value: item.metadata, onChange: (e) => set({ metadata: e.target.value }), readOnly })
-      ] })
-    ] });
-  }
   function StructuredDiffSummary({ unified, specific }) {
     const added = specific.filter((item) => !unified.includes(item));
     const missing = unified.filter((item) => !specific.includes(item));
@@ -26393,20 +26395,80 @@
       ] })
     ] });
   }
-  function StructuredFieldDiffs({ fields }) {
-    const changed = fields.filter(([, unified, specific]) => unified !== specific);
-    if (changed.length === 0) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-diff ok", children: "Same fields as unified." });
-    }
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-field-diffs", children: changed.map(([label, unified, specific]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-structured-field-diff", children: [
+  function commonItemContentWithField(item, field, value) {
+    return stringifyCommonItemDraft({ ...item, [field]: value });
+  }
+  function StructuredEditableFieldDiffs({
+    busy,
+    unified,
+    specific,
+    unifiedItem,
+    specificItem,
+    unifiedDirty,
+    specificDirty,
+    onUnifiedContentChange,
+    onSpecificContentChange,
+    onSaveUnified,
+    onSaveSpecific
+  }) {
+    const onUnifiedFieldChange = (field, lineNumber, fallbackIndex, content) => {
+      const fieldContent = replaceLine(unifiedItem[field], lineNumber, fallbackIndex, content);
+      const nextContent = commonItemContentWithField(unifiedItem, field, fieldContent);
+      if (nextContent) onUnifiedContentChange(nextContent);
+    };
+    const onSpecificFieldChange = (field, lineNumber, fallbackIndex, content) => {
+      const fieldContent = replaceLine(specificItem[field], lineNumber, fallbackIndex, content);
+      const nextContent = commonItemContentWithField(specificItem, field, fieldContent);
+      if (nextContent) onSpecificContentChange(nextContent);
+    };
+    const applyUnifiedFieldRows = (field, rows) => {
+      const fieldContent = applyRowsToContent(unifiedItem[field], rows, "unified");
+      const nextContent = commonItemContentWithField(unifiedItem, field, fieldContent);
+      if (nextContent) onUnifiedContentChange(nextContent);
+    };
+    const applySpecificFieldRows = (field, rows) => {
+      const fieldContent = applyRowsToContent(specificItem[field], rows, "specific");
+      const nextContent = commonItemContentWithField(specificItem, field, fieldContent);
+      if (nextContent) onSpecificContentChange(nextContent);
+    };
+    const applyUnifiedFieldBlock = (field) => {
+      const nextContent = commonItemContentWithField(unifiedItem, field, specificItem[field]);
+      if (nextContent) onUnifiedContentChange(nextContent);
+    };
+    const applySpecificFieldBlock = (field) => {
+      const nextContent = commonItemContentWithField(specificItem, field, unifiedItem[field]);
+      if (nextContent) onSpecificContentChange(nextContent);
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-field-diffs", children: COMMON_ITEM_FIELDS.map(({ field, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-structured-field-diff", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-field-diff-title", children: label }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         AlignedDiffView,
         {
           leftLabel: "Unified",
-          rightLabel: "Specific",
-          unifiedContent: unified,
-          specificContent: specific
+          rightLabel: specific.provider_names.join(", "),
+          leftPath: unified.path,
+          rightPath: specific.path,
+          unifiedContent: unifiedItem[field],
+          specificContent: specificItem[field],
+          editable: {
+            busy,
+            leftDirty: unifiedDirty,
+            rightDirty: specificDirty,
+            leftWritable: unified.writable && !busy,
+            rightWritable: specific.writable && !busy,
+            onSaveLeft: onSaveUnified,
+            onSaveRight: onSaveSpecific,
+            onChangeLeft: (lineNumber, fallbackIndex, content) => {
+              onUnifiedFieldChange(field, lineNumber, fallbackIndex, content);
+            },
+            onChangeRight: (lineNumber, fallbackIndex, content) => {
+              onSpecificFieldChange(field, lineNumber, fallbackIndex, content);
+            },
+            onApplyLeftBlock: () => applyUnifiedFieldBlock(field),
+            onApplyRightBlock: () => applySpecificFieldBlock(field),
+            onApplyLeftRows: (rows) => applyUnifiedFieldRows(field, rows),
+            onApplyRightRows: (rows) => applySpecificFieldRows(field, rows)
+          }
         }
       )
     ] }, label)) });

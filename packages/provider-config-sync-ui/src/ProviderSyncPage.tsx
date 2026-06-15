@@ -9,6 +9,7 @@ import {
 import {
   parseCommonItemDraft,
   parseMcpServers,
+  stringifyCommonItemDraft,
   type CommonItemDraft,
   type McpServerDraft,
 } from "@better-agent/provider-config-sync-core/items";
@@ -67,6 +68,12 @@ const CREATE_CAPABILITY_CATEGORIES = [
   { id: "agent", label: "Subagent" },
   { id: "command", label: "Command" },
 ] as const;
+const COMMON_ITEM_FIELDS: Array<{ field: keyof CommonItemDraft; label: string }> = [
+  { field: "name", label: "Name" },
+  { field: "description", label: "Description" },
+  { field: "instructions", label: "Instructions" },
+  { field: "metadata", label: "Provider extensions" },
+];
 const DEFAULT_AUTO_POLICY: ProviderSyncAutoPolicy = {
   additive: "off",
   removal: "off",
@@ -1061,9 +1068,17 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                         <StructuredMissingSpecific specific={selectedSpecific} />
                       ) : isStructuredCapability(selectedCapability) ? (
                         <StructuredSpecificView
+                          busy={busy}
                           capability={selectedCapability}
-                          unifiedContent={debouncedDraftFor(unified)}
+                          unified={unified}
                           specific={{ ...selectedSpecific, content: debouncedDraftFor(selectedSpecific) }}
+                          unifiedContent={debouncedDraftFor(unified)}
+                          unifiedDirty={isDirty(unified)}
+                          specificDirty={isDirty(selectedSpecific)}
+                          onUnifiedContentChange={(content) => updateDraft(unified, content)}
+                          onSpecificContentChange={(content) => updateDraft(selectedSpecific, content)}
+                          onSaveUnified={() => void saveFile(unified)}
+                          onSaveSpecific={() => void saveFile(selectedSpecific)}
                         />
                       ) : (
                         <EditableAlignedFileDiff
@@ -1174,13 +1189,29 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
 }
 
 function StructuredSpecificView({
+  busy,
   capability,
+  unified,
   unifiedContent,
   specific,
+  unifiedDirty,
+  specificDirty,
+  onUnifiedContentChange,
+  onSpecificContentChange,
+  onSaveUnified,
+  onSaveSpecific,
 }: {
+  busy: boolean;
   capability: ProviderSyncCapability;
+  unified: ProviderSyncFile;
   unifiedContent: string;
   specific: ProviderSyncFile;
+  unifiedDirty: boolean;
+  specificDirty: boolean;
+  onUnifiedContentChange: (content: string) => void;
+  onSpecificContentChange: (content: string) => void;
+  onSaveUnified: () => void;
+  onSaveSpecific: () => void;
 }) {
   if (!specific.exists) return <StructuredMissingSpecific specific={specific} />;
   if (capability.capability_id === "mcp") {
@@ -1203,20 +1234,22 @@ function StructuredSpecificView({
   if (capability.category === "agent" || capability.category === "skill" || capability.category === "command") {
     const unifiedItem = parseCommonItemDraft(unifiedContent);
     const item = parseCommonItemDraft(specific.content);
-    if (!item) return <StructuredParseError />;
+    if (!unifiedItem || !item) return <StructuredParseError />;
     return (
       <div className="provider-sync-structured provider-sync-structured-specific">
-        {unifiedItem && (
-          <StructuredFieldDiffs
-            fields={[
-              ["Name", unifiedItem.name, item.name],
-              ["Description", unifiedItem.description, item.description],
-              ["Instructions", unifiedItem.instructions, item.instructions],
-              ["Provider extensions", unifiedItem.metadata, item.metadata],
-            ]}
-          />
-        )}
-        <CommonItemFields item={item} readOnly />
+        <StructuredEditableFieldDiffs
+          busy={busy}
+          unified={unified}
+          specific={specific}
+          unifiedItem={unifiedItem}
+          specificItem={item}
+          unifiedDirty={unifiedDirty}
+          specificDirty={specificDirty}
+          onUnifiedContentChange={onUnifiedContentChange}
+          onSpecificContentChange={onSpecificContentChange}
+          onSaveUnified={onSaveUnified}
+          onSaveSpecific={onSaveSpecific}
+        />
       </div>
     );
   }
@@ -1926,43 +1959,6 @@ function McpServerFields({
   );
 }
 
-function CommonItemFields({
-  item,
-  readOnly,
-  onChange,
-}: {
-  item: CommonItemDraft;
-  readOnly: boolean;
-  onChange?: (item: CommonItemDraft) => void;
-}) {
-  const set = (patch: Partial<CommonItemDraft>) => onChange?.({ ...item, ...patch });
-  return (
-    <div className="provider-sync-item-card">
-      <label>
-        <span>Name</span>
-        <input value={item.name} onChange={(e) => set({ name: e.target.value })} readOnly={readOnly} />
-      </label>
-      <label>
-        <span>Description</span>
-        <textarea value={item.description} onChange={(e) => set({ description: e.target.value })} readOnly={readOnly} />
-      </label>
-      <label>
-        <span>Instructions</span>
-        <textarea
-          className="provider-sync-large-textarea"
-          value={item.instructions}
-          onChange={(e) => set({ instructions: e.target.value })}
-          readOnly={readOnly}
-        />
-      </label>
-      <label>
-        <span>Provider extensions</span>
-        <textarea value={item.metadata} onChange={(e) => set({ metadata: e.target.value })} readOnly={readOnly} />
-      </label>
-    </div>
-  );
-}
-
 function StructuredDiffSummary({ unified, specific }: { unified: string[]; specific: string[] }) {
   const added = specific.filter((item) => !unified.includes(item));
   const missing = unified.filter((item) => !specific.includes(item));
@@ -1977,21 +1973,109 @@ function StructuredDiffSummary({ unified, specific }: { unified: string[]; speci
   );
 }
 
-function StructuredFieldDiffs({ fields }: { fields: Array<[string, string, string]> }) {
-  const changed = fields.filter(([, unified, specific]) => unified !== specific);
-  if (changed.length === 0) {
-    return <div className="provider-sync-structured-diff ok">Same fields as unified.</div>;
-  }
+function commonItemContentWithField(
+  item: CommonItemDraft,
+  field: keyof CommonItemDraft,
+  value: string,
+): string | null {
+  return stringifyCommonItemDraft({ ...item, [field]: value });
+}
+
+function StructuredEditableFieldDiffs({
+  busy,
+  unified,
+  specific,
+  unifiedItem,
+  specificItem,
+  unifiedDirty,
+  specificDirty,
+  onUnifiedContentChange,
+  onSpecificContentChange,
+  onSaveUnified,
+  onSaveSpecific,
+}: {
+  busy: boolean;
+  unified: ProviderSyncFile;
+  specific: ProviderSyncFile;
+  unifiedItem: CommonItemDraft;
+  specificItem: CommonItemDraft;
+  unifiedDirty: boolean;
+  specificDirty: boolean;
+  onUnifiedContentChange: (content: string) => void;
+  onSpecificContentChange: (content: string) => void;
+  onSaveUnified: () => void;
+  onSaveSpecific: () => void;
+}) {
+  const onUnifiedFieldChange = (
+    field: keyof CommonItemDraft,
+    lineNumber: number | null,
+    fallbackIndex: number,
+    content: string,
+  ) => {
+    const fieldContent = replaceLine(unifiedItem[field], lineNumber, fallbackIndex, content);
+    const nextContent = commonItemContentWithField(unifiedItem, field, fieldContent);
+    if (nextContent) onUnifiedContentChange(nextContent);
+  };
+  const onSpecificFieldChange = (
+    field: keyof CommonItemDraft,
+    lineNumber: number | null,
+    fallbackIndex: number,
+    content: string,
+  ) => {
+    const fieldContent = replaceLine(specificItem[field], lineNumber, fallbackIndex, content);
+    const nextContent = commonItemContentWithField(specificItem, field, fieldContent);
+    if (nextContent) onSpecificContentChange(nextContent);
+  };
+  const applyUnifiedFieldRows = (field: keyof CommonItemDraft, rows: AlignedDiffRow[]) => {
+    const fieldContent = applyRowsToContent(unifiedItem[field], rows, "unified");
+    const nextContent = commonItemContentWithField(unifiedItem, field, fieldContent);
+    if (nextContent) onUnifiedContentChange(nextContent);
+  };
+  const applySpecificFieldRows = (field: keyof CommonItemDraft, rows: AlignedDiffRow[]) => {
+    const fieldContent = applyRowsToContent(specificItem[field], rows, "specific");
+    const nextContent = commonItemContentWithField(specificItem, field, fieldContent);
+    if (nextContent) onSpecificContentChange(nextContent);
+  };
+  const applyUnifiedFieldBlock = (field: keyof CommonItemDraft) => {
+    const nextContent = commonItemContentWithField(unifiedItem, field, specificItem[field]);
+    if (nextContent) onUnifiedContentChange(nextContent);
+  };
+  const applySpecificFieldBlock = (field: keyof CommonItemDraft) => {
+    const nextContent = commonItemContentWithField(specificItem, field, unifiedItem[field]);
+    if (nextContent) onSpecificContentChange(nextContent);
+  };
+
   return (
     <div className="provider-sync-structured-field-diffs">
-      {changed.map(([label, unified, specific]) => (
+      {COMMON_ITEM_FIELDS.map(({ field, label }) => (
         <section className="provider-sync-structured-field-diff" key={label}>
           <div className="provider-sync-structured-field-diff-title">{label}</div>
           <AlignedDiffView
             leftLabel="Unified"
-            rightLabel="Specific"
-            unifiedContent={unified}
-            specificContent={specific}
+            rightLabel={specific.provider_names.join(", ")}
+            leftPath={unified.path}
+            rightPath={specific.path}
+            unifiedContent={unifiedItem[field]}
+            specificContent={specificItem[field]}
+            editable={{
+              busy,
+              leftDirty: unifiedDirty,
+              rightDirty: specificDirty,
+              leftWritable: unified.writable && !busy,
+              rightWritable: specific.writable && !busy,
+              onSaveLeft: onSaveUnified,
+              onSaveRight: onSaveSpecific,
+              onChangeLeft: (lineNumber, fallbackIndex, content) => {
+                onUnifiedFieldChange(field, lineNumber, fallbackIndex, content);
+              },
+              onChangeRight: (lineNumber, fallbackIndex, content) => {
+                onSpecificFieldChange(field, lineNumber, fallbackIndex, content);
+              },
+              onApplyLeftBlock: () => applyUnifiedFieldBlock(field),
+              onApplyRightBlock: () => applySpecificFieldBlock(field),
+              onApplyLeftRows: (rows) => applyUnifiedFieldRows(field, rows),
+              onApplyRightRows: (rows) => applySpecificFieldRows(field, rows),
+            }}
           />
         </section>
       ))}

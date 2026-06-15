@@ -59,3 +59,14 @@ export function parseCommonItemDraft(content: string): CommonItemDraft | null {
       : "{}",
   };
 }
+
+export function stringifyCommonItemDraft(item: CommonItemDraft): string | null {
+  const metadata = parseJsonObject(item.metadata);
+  if (!metadata) return null;
+  return stringifyJson({
+    name: item.name,
+    description: item.description,
+    instructions: item.instructions,
+    metadata,
+  });
+}

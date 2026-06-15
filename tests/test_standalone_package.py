@@ -223,6 +223,17 @@ def t_diff_text_edits_preserve_focus() -> None:
     check("editableDiffRowKey" in page, "editable diff rows use stable render keys")
 
 
+def t_structured_skill_fields_use_editable_side_by_side_diffs() -> None:
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    structured_view = page.split("function StructuredSpecificView(", 1)[1].split("function ProviderSyncPageSettings(", 1)[0]
+    field_diffs = page.split("function StructuredEditableFieldDiffs(", 1)[1].split("function StructuredParseError(", 1)[0]
+    check("StructuredEditableFieldDiffs" in structured_view, "structured skills render field-level side-by-side diffs")
+    check("CommonItemFields item={item} readOnly" not in structured_view, "structured skills do not use read-only field cards")
+    check("editable={{" in field_diffs, "structured field diffs use editable diff controls")
+    check("onUnifiedFieldChange" in field_diffs, "structured unified field edits update the unified draft")
+    check("onSpecificFieldChange" in field_diffs, "structured specific field edits update the provider draft")
+
+
 def t_mcp_server_exposes_sync_tools() -> None:
     server = create_server()
     tools = asyncio.run(server.list_tools())
@@ -872,6 +883,7 @@ def main() -> int:
     t_diff_views_use_natural_height_without_internal_scrolling()
     t_file_actions_live_in_diff_header()
     t_diff_text_edits_preserve_focus()
+    t_structured_skill_fields_use_editable_side_by_side_diffs()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()
     t_automation_builds_noninteractive_agent_commands()
