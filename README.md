@@ -55,7 +55,7 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
   Use the TypeScript diff/item helpers in your own UI.
 
 - **Capability picker**
-  Embed a host-neutral picker that lists every known global and project capability so another app can attach or apply the selected capability in its own workflow.
+  Embed a host-neutral picker that lists every known global and project capability, converts the selected capability into all configured provider forms, and lets another app use all outputs or one provider-specific output.
 
 - **Safer writes**
   Writes use expected-content checks, atomic creation, and first-write backups to avoid silent clobbering.
@@ -209,7 +209,7 @@ DELETE /api/provider-config-sync/unified-capability-item
 
 Use `GET /api/provider-config-sync?cwd=...` to discover capabilities and file entries. The response includes unified entries and provider-specific entries with `entry_id`, content, existence, writability, estimated token counts, diff status, and provider metadata.
 
-Use `GET /api/provider-config-sync/capability-picker?cwd=...` when a host needs to choose a capability from anywhere Provider Config Sync knows about. The response flattens global capabilities plus every configured primary project capability into picker sources, each with the original capability payload and a preferred readable entry. The endpoint is deliberately host-neutral: it does not know about any one application runtime. A host can render the picker, receive the selected source, and decide how that selection applies to its own objects.
+Use `GET /api/provider-config-sync/capability-picker?cwd=...` when a host needs to choose a capability from anywhere Provider Config Sync knows about. The response flattens global capabilities plus every configured primary project capability into picker sources, each with the original capability payload, a preferred readable entry, and converted outputs for every configured provider-specific form. The endpoint is deliberately host-neutral: it does not know about any one application runtime. A host can render the picker, receive all provider outputs or one selected provider output, and decide how that selection applies to its own objects.
 
 ## MCP Tools
 

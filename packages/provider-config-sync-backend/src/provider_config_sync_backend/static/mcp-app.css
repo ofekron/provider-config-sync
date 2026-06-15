@@ -1107,7 +1107,7 @@
 }
 .provider-capability-picker-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(140px, 190px);
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) minmax(160px, 210px);
   gap: 10px;
 }
 .provider-capability-picker-list {

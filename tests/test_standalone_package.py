@@ -172,7 +172,9 @@ def t_capability_picker_lists_global_and_known_project_sources() -> None:
         command.write_text("---\ndescription: Deploy\n---\nDeploy it.\n", encoding="utf-8")
         api.configure(
             provider_records=lambda: [
-                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(claude_home)}
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(claude_home)},
+                {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": str(wipe / "codex")},
+                {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": str(wipe / "gemini")},
             ],
             project_records=lambda: [
                 {"path": str(project_a), "node_id": "primary"},
@@ -189,6 +191,13 @@ def t_capability_picker_lists_global_and_known_project_sources() -> None:
         check(("project", str(project_b), "command-deploy") in keys, "picker lists other known project capabilities")
         selected = next(source for source in sources if source["source_cwd"] == str(project_a) and source["capability"]["capability_id"] == "instructions")
         check(selected["preferred_entry"]["content"] == "project a instructions\n", "picker exposes preferred capability content")
+
+        deploy = next(source for source in sources if source["source_cwd"] == str(project_b) and source["capability"]["capability_id"] == "command-deploy")
+        outputs = {output["provider_kind"]: output for output in deploy["outputs"]}
+        check(set(outputs) == {"claude", "codex", "gemini"}, "picker converts a capability to all provider forms")
+        check("Deploy it." in outputs["claude"]["content"], "picker renders Claude command form")
+        check("provider-config-sync-kind: command" in outputs["codex"]["content"], "picker renders Codex command skill form")
+        check('prompt = "Deploy it.\\n"' in outputs["gemini"]["content"], "picker renders Gemini command form")
 
     finally:
         shutil.rmtree(wipe)

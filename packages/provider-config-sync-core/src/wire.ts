@@ -188,6 +188,20 @@ export interface ProviderSyncCapabilityPickerSource {
   source_label: string;
   capability: ProviderSyncCapability;
   preferred_entry: ProviderSyncFile | null;
+  outputs: ProviderSyncCapabilityPickerOutput[];
+}
+
+export interface ProviderSyncCapabilityPickerOutput {
+  provider_kind: string;
+  provider_name: string;
+  entry_id: string;
+  path: string;
+  label: string;
+  content_kind: string;
+  language: string;
+  content: string;
+  token_count: number;
+  render_error: string | null;
 }
 
 export interface ProviderSyncCapabilityPickerResponse {

@@ -2398,6 +2398,58 @@ def _picker_preferred_entry(capability: dict) -> dict | None:
     return None
 
 
+def _render_content_for_kind(content_kind: str, content: str) -> str:
+    if content_kind == _CONTENT_FILE:
+        return content
+    if content_kind == _CONTENT_JSON_MCP:
+        return json.dumps({"mcpServers": _mcp_servers_from_fragment(content)}, indent=2, sort_keys=True) + "\n"
+    if content_kind == _CONTENT_TOML_MCP:
+        return _toml_dumps({"mcp_servers": _mcp_servers_from_fragment(content)})
+    if content_kind == _CONTENT_MARKDOWN_SKILL:
+        return _markdown_skill_from_normalized(content)
+    if content_kind == _CONTENT_MARKDOWN_AGENT:
+        return _markdown_agent_from_normalized(content)
+    if content_kind == _CONTENT_TOML_AGENT:
+        return _toml_agent_from_normalized(content)
+    if content_kind == _CONTENT_MARKDOWN_COMMAND:
+        return _markdown_command_from_normalized(content)
+    if content_kind == _CONTENT_TOML_COMMAND:
+        return _toml_command_from_normalized(content)
+    if content_kind == _CONTENT_CODEX_COMMAND_SKILL:
+        return _codex_command_skill_from_normalized(content)
+    raise HTTPException(status_code=400, detail=f"unsupported content kind: {content_kind}")
+
+
+def _picker_outputs(capability: dict, content: str | None) -> list[dict]:
+    outputs: list[dict] = []
+    if content is None:
+        return outputs
+    for entry in capability.get("specifics") or []:
+        provider_kind = entry["provider_kinds"][0] if entry.get("provider_kinds") else ""
+        provider_name = entry["provider_names"][0] if entry.get("provider_names") else provider_kind
+        try:
+            rendered = _render_content_for_kind(entry.get("content_kind") or _CONTENT_FILE, content)
+            render_error = None
+        except HTTPException as error:
+            rendered = ""
+            render_error = str(error.detail)
+        outputs.append(
+            {
+                "provider_kind": provider_kind,
+                "provider_name": provider_name,
+                "entry_id": entry["entry_id"],
+                "path": entry["path"],
+                "label": entry["label"],
+                "content_kind": entry.get("content_kind") or _CONTENT_FILE,
+                "language": entry["language"],
+                "content": rendered,
+                "token_count": _estimate_tokens(rendered) if rendered else 0,
+                "render_error": render_error,
+            }
+        )
+    return outputs
+
+
 def _picker_project_cwds(cwd: str = "") -> list[str]:
     seen: dict[str, None] = {}
     for project in _project_records_source():
@@ -2419,6 +2471,8 @@ def _capability_picker_sources(cwd: str = "") -> list[dict]:
     global_payload = _discover("")
     for capability in global_payload["groups"]["global"]:
         source_cwd = ""
+        preferred_entry = _picker_preferred_entry(capability)
+        preferred_content = preferred_entry["content"] if preferred_entry is not None else None
         sources.append(
             {
                 "source_id": _picker_source_id("global", source_cwd, capability["category"], capability["capability_id"]),
@@ -2426,12 +2480,15 @@ def _capability_picker_sources(cwd: str = "") -> list[dict]:
                 "source_cwd": source_cwd,
                 "source_label": "Global",
                 "capability": capability,
-                "preferred_entry": _picker_preferred_entry(capability),
+                "preferred_entry": preferred_entry,
+                "outputs": _picker_outputs(capability, preferred_content),
             }
         )
     for source_cwd in _picker_project_cwds(cwd):
         payload = _discover(source_cwd)
         for capability in payload["groups"]["project"]:
+            preferred_entry = _picker_preferred_entry(capability)
+            preferred_content = preferred_entry["content"] if preferred_entry is not None else None
             sources.append(
                 {
                     "source_id": _picker_source_id("project", source_cwd, capability["category"], capability["capability_id"]),
@@ -2439,7 +2496,8 @@ def _capability_picker_sources(cwd: str = "") -> list[dict]:
                     "source_cwd": source_cwd,
                     "source_label": Path(source_cwd).name or source_cwd,
                     "capability": capability,
-                    "preferred_entry": _picker_preferred_entry(capability),
+                    "preferred_entry": preferred_entry,
+                    "outputs": _picker_outputs(capability, preferred_content),
                 }
             )
     return sources

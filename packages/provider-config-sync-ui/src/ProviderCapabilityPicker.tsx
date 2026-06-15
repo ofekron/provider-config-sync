@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
+  ProviderSyncCapabilityPickerOutput,
   ProviderSyncCapabilityPickerSource,
   ProviderSyncScope,
 } from "@better-agent/provider-config-sync-core";
@@ -9,7 +10,7 @@ export interface ProviderCapabilityPickerProps {
   open: boolean;
   cwd?: string;
   client: Pick<ProviderSyncApiClient, "listCapabilityPickerSources">;
-  onSelect: (source: ProviderSyncCapabilityPickerSource) => void;
+  onSelect: (source: ProviderSyncCapabilityPickerSource, output?: ProviderSyncCapabilityPickerOutput) => void;
   onClose?: () => void;
 }
 
@@ -48,6 +49,7 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
   const [sources, setSources] = useState<ProviderSyncCapabilityPickerSource[]>([]);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<ProviderSyncScope | "all">("all");
+  const [providerKind, setProviderKind] = useState("all");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,10 +67,31 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
     const needle = query.trim().toLowerCase();
     return sources.filter((source) => {
       if (scope !== "all" && source.source_scope !== scope) return false;
+      if (providerKind !== "all" && !source.outputs.some((output) => output.provider_kind === providerKind)) return false;
       if (!needle) return true;
       return sourceSearchText(source).includes(needle);
     });
-  }, [sources, query, scope]);
+  }, [sources, query, scope, providerKind]);
+
+  const providerOptions = useMemo(() => {
+    const byKind = new Map<string, string>();
+    for (const source of sources) {
+      for (const output of source.outputs) {
+        if (output.provider_kind && !byKind.has(output.provider_kind)) {
+          byKind.set(output.provider_kind, output.provider_name || output.provider_kind);
+        }
+      }
+    }
+    return [...byKind.entries()].map(([kind, name]) => ({ kind, name }));
+  }, [sources]);
+
+  const selectSource = (source: ProviderSyncCapabilityPickerSource) => {
+    if (providerKind === "all") {
+      onSelect(source);
+      return;
+    }
+    onSelect(source, source.outputs.find((output) => output.provider_kind === providerKind));
+  };
 
   if (!open) return null;
 
@@ -98,6 +121,16 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
           <option value="global">Global</option>
           <option value="project">Project</option>
         </select>
+        <select
+          className="provider-sync-select"
+          value={providerKind}
+          onChange={(event) => setProviderKind(event.target.value)}
+        >
+          <option value="all">All provider forms</option>
+          {providerOptions.map((provider) => (
+            <option key={provider.kind} value={provider.kind}>{provider.name}</option>
+          ))}
+        </select>
       </div>
 
       {error && <div className="provider-sync-error">{error}</div>}
@@ -109,7 +142,7 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
           <button
             key={source.source_id}
             className="provider-capability-picker-item"
-            onClick={() => onSelect(source)}
+            onClick={() => selectSource(source)}
           >
             <span>
               <strong>{source.capability.name}</strong>
@@ -117,7 +150,13 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
             </span>
             <span>
               <em>{SCOPE_LABELS[source.source_scope as ProviderSyncScope]} · {source.source_label}</em>
-              <small>{formatTokens(source.capability.total_token_count)}</small>
+              <small>
+                {providerKind === "all"
+                  ? `${source.outputs.length} provider forms`
+                  : source.outputs.find((output) => output.provider_kind === providerKind)?.provider_name ?? "Unavailable"}
+                {" · "}
+                {formatTokens(source.capability.total_token_count)}
+              </small>
             </span>
           </button>
         ))}
