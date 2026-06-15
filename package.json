@@ -10,6 +10,9 @@
   "scripts": {
     "build:core": "npm --prefix packages/provider-config-sync-core run build",
     "build:ui": "npm --prefix packages/provider-config-sync-ui run build",
-    "build:mcp-ui": "npm --prefix packages/provider-config-sync-ui run build:mcp"
+    "build:mcp-ui": "npm --prefix packages/provider-config-sync-ui run build:mcp",
+    "build:standalone-ui": "npm --prefix packages/provider-config-sync-ui run build:standalone",
+    "build:assets": "npm run build:mcp-ui && npm run build:standalone-ui",
+    "standalone": "python -m provider_config_sync_backend.standalone"
   }
 }

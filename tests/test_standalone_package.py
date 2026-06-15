@@ -133,8 +133,21 @@ def t_standalone_app_loads_json_config() -> None:
         )
         app = create_app(config_path)
         paths = {route.path for route in app.routes}
+        by_path = {route.path: route for route in app.routes}
+        html = by_path["/"].endpoint().body.decode("utf-8")
+        js = by_path["/assets/standalone-app.js"].endpoint().body.decode("utf-8")
+        css = by_path["/assets/standalone-app.css"].endpoint().body.decode("utf-8")
+        alt_html = by_path["/provider-config-sync"].endpoint().body.decode("utf-8")
         check("/api/provider-config-sync" in paths, "standalone FastAPI app mounts provider-config-sync route")
         check("/api/provider-config-sync/projects" in paths, "standalone FastAPI app exposes project picker route")
+        check("/" in paths and "/provider-config-sync" in paths, "standalone FastAPI app serves browser UI routes")
+        check("/assets/standalone-app.js" in paths, "standalone FastAPI app serves browser JS asset")
+        check("/assets/standalone-app.css" in paths, "standalone FastAPI app serves browser CSS asset")
+        check("/assets/standalone-app.js" in html and "/assets/standalone-app.css" in html, "standalone HTML references browser assets")
+        check(alt_html == html, "standalone browser UI has root and named routes")
+        check("createFetchProviderSyncClient" in js, "standalone browser app uses HTTP API client")
+        check("McpHostBridge" not in js and "tools/call" not in js, "standalone browser app is independent of MCP host bridge")
+        check("provider-sync-page" in css, "standalone browser app serves shared UI styles")
     finally:
         shutil.rmtree(wipe)
 

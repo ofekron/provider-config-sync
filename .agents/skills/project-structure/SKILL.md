@@ -25,6 +25,9 @@ Provider Config Sync is a small monorepo with TypeScript core/UI packages and a 
 - Build TypeScript core: `npm run build:core`
 - Build TypeScript UI: `npm run build:ui`
 - Build MCP React UI asset: `npm run build:mcp-ui`
+- Build standalone browser UI asset: `npm run build:standalone-ui`
+- Build all backend-served UI assets: `npm run build:assets`
+- Run standalone backend from source: `npm run standalone`
 - Run Python regression tests: `python tests/test_standalone_package.py`
 
 ## Keeping This Skill Current

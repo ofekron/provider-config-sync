@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, Response
 
 from .api import configure, router
 
@@ -43,6 +45,10 @@ def _records(value: object, label: str) -> list[dict]:
 def create_app(config_path: str | Path | None = None) -> FastAPI:
     configure_from_file(config_path)
     app = FastAPI(title="Provider Config Sync")
+    app.add_api_route("/", standalone_app_html, methods=["GET"], include_in_schema=False)
+    app.add_api_route("/provider-config-sync", standalone_app_html, methods=["GET"], include_in_schema=False)
+    app.add_api_route("/assets/standalone-app.js", standalone_app_js, methods=["GET"], include_in_schema=False)
+    app.add_api_route("/assets/standalone-app.css", standalone_app_css, methods=["GET"], include_in_schema=False)
     app.include_router(router)
     return app
 
@@ -57,6 +63,36 @@ def configure_from_file(config_path: str | Path | None = None) -> None:
         project_records=lambda: projects,
         sync_home=lambda: sync_home,
     )
+
+
+def _asset_text(name: str) -> str:
+    return files(__package__).joinpath("static", name).read_text(encoding="utf-8")
+
+
+def standalone_app_html() -> HTMLResponse:
+    return HTMLResponse(
+        """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provider Config Sync</title>
+  <link rel="stylesheet" href="/assets/standalone-app.css">
+</head>
+<body>
+  <div id="root"></div>
+  <script src="/assets/standalone-app.js"></script>
+</body>
+</html>"""
+    )
+
+
+def standalone_app_js() -> Response:
+    return Response(_asset_text("standalone-app.js"), media_type="text/javascript")
+
+
+def standalone_app_css() -> Response:
+    return Response(_asset_text("standalone-app.css"), media_type="text/css")
 
 
 app = create_app()
