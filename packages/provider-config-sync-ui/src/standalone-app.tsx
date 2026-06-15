@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
-import { ProviderSyncPage } from "./ProviderSyncPage.js";
-import { createFetchProviderSyncClient } from "./client.js";
+import { ProviderConfigSyncPage } from "./ProviderConfigSyncPage.js";
+import { createFetchProviderConfigSyncClient } from "./client.js";
 import "./styles.css";
 
 const rootElement = document.getElementById("root");
@@ -9,10 +9,10 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <ProviderSyncPage
+  <ProviderConfigSyncPage
     open
     cwd={null}
     onClose={() => undefined}
-    client={createFetchProviderSyncClient({ baseUrl: window.location.origin })}
+    client={createFetchProviderConfigSyncClient({ baseUrl: window.location.origin })}
   />,
 );

@@ -14,36 +14,36 @@ import {
   type McpServerDraft,
 } from "@better-agent/provider-config-sync-core/items";
 import type {
-  ProviderSyncApplyRequest,
-  ProviderSyncAutoMode,
-  ProviderSyncAutoOperation,
-  ProviderSyncAutoOverrideMode,
-  ProviderSyncAutoPolicy,
-  ProviderSyncAutoRequest,
-  ProviderSyncAutoResponse,
-  ProviderSyncAutoSettings,
-  ProviderSyncAutoSettingsLevel,
-  ProviderSyncFile,
-  ProviderSyncCapability,
-  ProviderSyncCreateCapabilityRequest,
-  ProviderSyncDeleteCapabilityRequest,
-  ProviderSyncResponse,
-  ProviderSyncRestoreRequest,
-  ProviderSyncScope,
-  ProviderSyncTransferCapabilityRequest,
-  ProviderSyncWriteRequest,
+  ProviderConfigSyncApplyRequest,
+  ProviderConfigSyncAutoMode,
+  ProviderConfigSyncAutoOperation,
+  ProviderConfigSyncAutoOverrideMode,
+  ProviderConfigSyncAutoPolicy,
+  ProviderConfigSyncAutoRequest,
+  ProviderConfigSyncAutoResponse,
+  ProviderConfigSyncAutoSettings,
+  ProviderConfigSyncAutoSettingsLevel,
+  ProviderConfigSyncFile,
+  ProviderConfigSyncCapability,
+  ProviderConfigSyncCreateCapabilityRequest,
+  ProviderConfigSyncDeleteCapabilityRequest,
+  ProviderConfigSyncResponse,
+  ProviderConfigSyncRestoreRequest,
+  ProviderConfigSyncScope,
+  ProviderConfigSyncTransferCapabilityRequest,
+  ProviderConfigSyncWriteRequest,
 } from "@better-agent/provider-config-sync-core";
-import { type ProviderSyncApiClient, type ProviderSyncProject } from "./client.js";
+import { type ProviderConfigSyncApiClient, type ProviderConfigSyncProject } from "./client.js";
 
-export interface ProviderSyncPageProps {
+export interface ProviderConfigSyncPageProps {
   open: boolean;
   cwd: string | null;
   onClose: () => void;
-  client: ProviderSyncApiClient;
+  client: ProviderConfigSyncApiClient;
   subscribeExternalChanges?: (cb: () => void) => () => void;
 }
 
-const SCOPES: ProviderSyncScope[] = ["global", "project"];
+const SCOPES: ProviderConfigSyncScope[] = ["global", "project"];
 const CATEGORY_LABELS: Record<string, string> = {
   instructions: "Instructions",
   memory: "Memory",
@@ -52,12 +52,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   agent: "Subagents",
   command: "Commands",
 };
-const AUTO_OPERATIONS: { id: ProviderSyncAutoOperation; label: string }[] = [
+const AUTO_OPERATIONS: { id: ProviderConfigSyncAutoOperation; label: string }[] = [
   { id: "additive", label: "Additive" },
   { id: "removal", label: "Removal" },
   { id: "change", label: "Edit" },
 ];
-const AUTO_MODES: { id: ProviderSyncAutoMode; label: string }[] = [
+const AUTO_MODES: { id: ProviderConfigSyncAutoMode; label: string }[] = [
   { id: "off", label: "Off" },
   { id: "auto", label: "Auto" },
   { id: "review", label: "Review per hunk" },
@@ -74,22 +74,22 @@ const COMMON_ITEM_FIELDS: Array<{ field: keyof CommonItemDraft; label: string }>
   { field: "instructions", label: "Instructions" },
   { field: "metadata", label: "Provider extensions" },
 ];
-const DEFAULT_AUTO_POLICY: ProviderSyncAutoPolicy = {
+const DEFAULT_AUTO_POLICY: ProviderConfigSyncAutoPolicy = {
   additive: "off",
   removal: "off",
   change: "off",
 };
-const LLM_AUTO_POLICY: ProviderSyncAutoPolicy = {
+const LLM_AUTO_POLICY: ProviderConfigSyncAutoPolicy = {
   additive: "llm",
   removal: "llm",
   change: "llm",
 };
 
 function effectiveAutoPolicy(
-  settings: ProviderSyncAutoSettings | undefined,
+  settings: ProviderConfigSyncAutoSettings | undefined,
   cwd: string,
   capabilityId: string | undefined,
-): ProviderSyncAutoPolicy {
+): ProviderConfigSyncAutoPolicy {
   const policy = { ...DEFAULT_AUTO_POLICY, ...(settings?.global ?? {}) };
   if (capabilityId) {
     Object.assign(policy, settings?.capabilities?.[capabilityId] ?? {});
@@ -105,8 +105,8 @@ function effectiveAutoPolicy(
 }
 
 function inheritedAutoPolicy(
-  policy: Partial<Record<ProviderSyncAutoOperation, ProviderSyncAutoMode>> | undefined,
-): Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode> {
+  policy: Partial<Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoMode>> | undefined,
+): Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode> {
   return {
     additive: policy?.additive ?? "inherit",
     removal: policy?.removal ?? "inherit",
@@ -121,12 +121,12 @@ function formatTokens(count: number | undefined): string {
   return `${value.toLocaleString()} tok`;
 }
 
-function isStructuredCapability(capability: ProviderSyncCapability | undefined): boolean {
+function isStructuredCapability(capability: ProviderConfigSyncCapability | undefined): boolean {
   return capability?.capability_id === "mcp" || capability?.category === "agent" || capability?.category === "skill" || capability?.category === "command";
 }
 
 function providerSpecificStatus(
-  specific: ProviderSyncFile,
+  specific: ProviderConfigSyncFile,
   unifiedContent: string,
   specificContent: string,
 ): "missing" | "diff" | "aligned" {
@@ -134,12 +134,12 @@ function providerSpecificStatus(
   return unifiedContent === specificContent ? "aligned" : "diff";
 }
 
-function capabilityStatus(capability: ProviderSyncCapability): "missing" | "diff" | "aligned" {
+function capabilityStatus(capability: ProviderConfigSyncCapability): "missing" | "diff" | "aligned" {
   if (capability.missing_count > 0) return "missing";
   return capability.has_diffs ? "diff" : "aligned";
 }
 
-function collectProviderSyncContents(body: ProviderSyncResponse): Record<string, string> {
+function collectProviderConfigSyncContents(body: ProviderConfigSyncResponse): Record<string, string> {
   const contents: Record<string, string> = {};
   for (const file of body.files) contents[file.entry_id] = file.content;
   for (const capabilities of Object.values(body.groups)) {
@@ -167,28 +167,28 @@ function mergeFetchedDrafts(
   return merged;
 }
 
-function providerSyncFileDisplayName(file: ProviderSyncFile): string {
+function providerConfigSyncFileDisplayName(file: ProviderConfigSyncFile): string {
   return file.provider_names.length > 0 ? file.provider_names.join(", ") : file.label;
 }
 
-function shouldConfirmApplyTargetOverwrite(target: ProviderSyncFile): boolean {
+function shouldConfirmApplyTargetOverwrite(target: ProviderConfigSyncFile): boolean {
   return target.exists && target.content.trim().length > 0;
 }
 
-function canTransferCapability(capability: ProviderSyncCapability): boolean {
+function canTransferCapability(capability: ProviderConfigSyncCapability): boolean {
   return capability.category === "skill" || capability.category === "agent" || capability.category === "command";
 }
 
-export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }: ProviderSyncPageProps) {
-  const [data, setData] = useState<ProviderSyncResponse | null>(null);
-  const [projects, setProjects] = useState<ProviderSyncProject[]>([]);
-  const [scope, setScope] = useState<ProviderSyncScope>("project");
+export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }: ProviderConfigSyncPageProps) {
+  const [data, setData] = useState<ProviderConfigSyncResponse | null>(null);
+  const [projects, setProjects] = useState<ProviderConfigSyncProject[]>([]);
+  const [scope, setScope] = useState<ProviderConfigSyncScope>("project");
   const [capabilityMenuOpen, setCapabilityMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [transferCapabilityId, setTransferCapabilityId] = useState("");
   const [transferMode, setTransferMode] = useState<"copy" | "move">("copy");
-  const [transferTargetScope, setTransferTargetScope] = useState<ProviderSyncScope>("project");
+  const [transferTargetScope, setTransferTargetScope] = useState<ProviderConfigSyncScope>("project");
   const [transferTargetCwd, setTransferTargetCwd] = useState(cwd ?? "");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [newCapabilityCategory, setNewCapabilityCategory] = useState<"skill" | "agent" | "command">("skill");
@@ -203,7 +203,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   const [debouncedDrafts, setDebouncedDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoLog, setAutoLog] = useState<ProviderSyncAutoResponse | null>(null);
+  const [autoLog, setAutoLog] = useState<ProviderConfigSyncAutoResponse | null>(null);
   const fetchSequence = useRef(0);
   const latestContents = useRef<Record<string, string>>({});
 
@@ -237,7 +237,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
       if (sequence !== fetchSequence.current) return;
       setData(body);
       const previousContents = latestContents.current;
-      const nextContents = collectProviderSyncContents(body);
+      const nextContents = collectProviderConfigSyncContents(body);
       setDrafts((current) => mergeFetchedDrafts(current, previousContents, nextContents));
       setDebouncedDrafts((current) => mergeFetchedDrafts(current, previousContents, nextContents));
       latestContents.current = nextContents;
@@ -260,8 +260,8 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     [data, scope],
   );
   const capabilityGroups = useMemo(() => {
-    const groups: { category: string; label: string; capabilities: ProviderSyncCapability[] }[] = [];
-    const byCategory = new Map<string, ProviderSyncCapability[]>();
+    const groups: { category: string; label: string; capabilities: ProviderConfigSyncCapability[] }[] = [];
+    const byCategory = new Map<string, ProviderConfigSyncCapability[]>();
     for (const capability of capabilities) {
       const items = byCategory.get(capability.category) ?? [];
       items.push(capability);
@@ -313,8 +313,8 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   const autoPolicy = effectiveAutoPolicy(data?.auto_settings, targetCwd, selectedCapability?.capability_id);
 
   const saveAutoSettings = useCallback(async (
-    level: ProviderSyncAutoSettingsLevel,
-    policy: ProviderSyncAutoPolicy | Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode>,
+    level: ProviderConfigSyncAutoSettingsLevel,
+    policy: ProviderConfigSyncAutoPolicy | Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode>,
   ) => {
     setBusy(true);
     try {
@@ -366,25 +366,25 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   }, [drafts]);
 
   const draftFor = useCallback(
-    (file: ProviderSyncFile | undefined) => file ? drafts[file.entry_id] ?? file.content : "",
+    (file: ProviderConfigSyncFile | undefined) => file ? drafts[file.entry_id] ?? file.content : "",
     [drafts],
   );
   const debouncedDraftFor = useCallback(
-    (file: ProviderSyncFile | undefined) => file ? debouncedDrafts[file.entry_id] ?? draftFor(file) : "",
+    (file: ProviderConfigSyncFile | undefined) => file ? debouncedDrafts[file.entry_id] ?? draftFor(file) : "",
     [debouncedDrafts, draftFor],
   );
-  const updateDraft = useCallback((file: ProviderSyncFile, content: string) => {
+  const updateDraft = useCallback((file: ProviderConfigSyncFile, content: string) => {
     setDrafts((current) => ({ ...current, [file.entry_id]: content }));
   }, []);
-  const isDirty = useCallback((file: ProviderSyncFile | undefined) => {
+  const isDirty = useCallback((file: ProviderConfigSyncFile | undefined) => {
     if (!file) return false;
     return draftFor(file) !== file.content;
   }, [draftFor]);
 
-  const saveFileContent = useCallback(async (file: ProviderSyncFile, content: string) => {
+  const saveFileContent = useCallback(async (file: ProviderConfigSyncFile, content: string) => {
     setBusy(true);
     try {
-      const body: ProviderSyncWriteRequest = {
+      const body: ProviderConfigSyncWriteRequest = {
         cwd: targetCwd,
         entry_id: file.entry_id,
         expected_content: file.exists ? file.content : null,
@@ -399,20 +399,20 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     }
   }, [targetCwd, fetchSync]);
 
-  const saveFile = useCallback(async (file: ProviderSyncFile) => {
+  const saveFile = useCallback(async (file: ProviderConfigSyncFile) => {
     await saveFileContent(file, draftFor(file));
   }, [draftFor, saveFileContent]);
 
-  const updateAndSaveFile = useCallback((file: ProviderSyncFile, content: string) => {
+  const updateAndSaveFile = useCallback((file: ProviderConfigSyncFile, content: string) => {
     updateDraft(file, content);
     if (content !== file.content) void saveFileContent(file, content);
   }, [saveFileContent, updateDraft]);
 
-  const restoreFile = useCallback(async (file: ProviderSyncFile) => {
-    if (!window.confirm(`Restore ${providerSyncFileDisplayName(file)} from its Provider Sync backup?`)) return;
+  const restoreFile = useCallback(async (file: ProviderConfigSyncFile) => {
+    if (!window.confirm(`Restore ${providerConfigSyncFileDisplayName(file)} from its Provider Config Sync backup?`)) return;
     setBusy(true);
     try {
-      const body: ProviderSyncRestoreRequest = {
+      const body: ProviderConfigSyncRestoreRequest = {
         cwd: targetCwd,
         entry_id: file.entry_id,
         expected_content: file.exists ? file.content : null,
@@ -426,7 +426,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     }
   }, [targetCwd, fetchSync]);
 
-  const deleteCapability = useCallback(async (capability: ProviderSyncCapability) => {
+  const deleteCapability = useCallback(async (capability: ProviderConfigSyncCapability) => {
     const entries = [capability.unified, ...capability.specifics];
     const existingCount = entries.filter((entry) => entry.exists).length;
     const label = `${capability.name} (${existingCount} existing file${existingCount === 1 ? "" : "s"})`;
@@ -436,7 +436,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
       const expected_contents = Object.fromEntries(
         entries.map((entry) => [entry.entry_id, entry.exists ? entry.content : null]),
       );
-      const body: ProviderSyncDeleteCapabilityRequest = {
+      const body: ProviderConfigSyncDeleteCapabilityRequest = {
         cwd: targetCwd,
         scope: capability.scope,
         capability_id: capability.capability_id,
@@ -459,7 +459,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     if (!name || newCapabilityProviders.length === 0) return;
     setBusy(true);
     try {
-      const body: ProviderSyncCreateCapabilityRequest = {
+      const body: ProviderConfigSyncCreateCapabilityRequest = {
         cwd: targetCwd,
         scope,
         category: newCapabilityCategory,
@@ -493,7 +493,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     fetchSync,
   ]);
 
-  const transferCapability = useCallback(async (capability: ProviderSyncCapability) => {
+  const transferCapability = useCallback(async (capability: ProviderConfigSyncCapability) => {
     if (!canTransferCapability(capability) || !transferTargetScope) return;
     if (transferTargetScope === "project" && !transferTargetCwd) return;
     const sourceLabel = capability.scope === "global" ? "global" : selectedProjectPath;
@@ -511,7 +511,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
       const expected_contents = Object.fromEntries(
         entries.map((entry) => [entry.entry_id, entry.exists ? entry.content : null]),
       );
-      const body: ProviderSyncTransferCapabilityRequest = {
+      const body: ProviderConfigSyncTransferCapabilityRequest = {
         cwd: targetCwd,
         scope: capability.scope,
         capability_id: capability.capability_id,
@@ -547,16 +547,16 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     transferTargetEffectiveCwd,
   ]);
 
-  const apply = useCallback(async (capability: ProviderSyncCapability, source: ProviderSyncFile, target: ProviderSyncFile) => {
+  const apply = useCallback(async (capability: ProviderConfigSyncCapability, source: ProviderConfigSyncFile, target: ProviderConfigSyncFile) => {
     if (
       shouldConfirmApplyTargetOverwrite(target)
-      && !window.confirm(`This will overwrite existing content in ${providerSyncFileDisplayName(target)}. Continue?`)
+      && !window.confirm(`This will overwrite existing content in ${providerConfigSyncFileDisplayName(target)}. Continue?`)
     ) {
       return;
     }
     setBusy(true);
     try {
-      const body: ProviderSyncApplyRequest = {
+      const body: ProviderConfigSyncApplyRequest = {
         cwd: targetCwd,
         capability_id: capability.capability_id,
         source_entry_id: source.entry_id,
@@ -574,18 +574,18 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   }, [targetCwd, fetchSync]);
 
   const runAutoSync = useCallback(async (
-    capability: ProviderSyncCapability,
-    source: ProviderSyncFile,
-    target: ProviderSyncFile,
+    capability: ProviderConfigSyncCapability,
+    source: ProviderConfigSyncFile,
+    target: ProviderConfigSyncFile,
     options: {
       llmHunkIds?: string[];
-      policy?: ProviderSyncAutoPolicy;
+      policy?: ProviderConfigSyncAutoPolicy;
       refetch?: boolean;
     } = {},
   ) => {
     setBusy(true);
     try {
-      const body: ProviderSyncAutoRequest = {
+      const body: ProviderConfigSyncAutoRequest = {
         cwd: targetCwd,
         capability_id: capability.capability_id,
         source_entry_id: source.entry_id,
@@ -615,10 +615,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     if (!selectedCapability || !unified) return;
     setBusy(true);
     try {
-      let latestLog: ProviderSyncAutoResponse | null = null;
+      let latestLog: ProviderConfigSyncAutoResponse | null = null;
       for (const target of selectedCapability.specifics) {
         if (!target.writable || !target.exists || target.disabled || target.entry_id === unified.entry_id) continue;
-        const body: ProviderSyncAutoRequest = {
+        const body: ProviderConfigSyncAutoRequest = {
           cwd: targetCwd,
           capability_id: selectedCapability.capability_id,
           source_entry_id: unified.entry_id,
@@ -660,23 +660,23 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   };
 
   return (
-    <div className={`provider-sync-page${capabilityMenuOpen ? " menu-open" : ""}`} data-testid="provider-sync-page">
-      <header className="provider-sync-topbar">
+    <div className={`provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}`} data-testid="provider-config-sync-page">
+      <header className="provider-config-sync-topbar">
         <div>
-          <h1>Provider Sync</h1>
-          <div className="provider-sync-subtitle">
+          <h1>Provider Config Sync</h1>
+          <div className="provider-config-sync-subtitle">
             {scope}
             {selectedCapability ? ` · ${selectedCapability.name}` : ""}
             {selectedCapability ? ` · ${formatTokens(selectedCapability.total_token_count)} est.` : ""}
           </div>
         </div>
-        <div className="provider-sync-topbar-actions">
+        <div className="provider-config-sync-topbar-actions">
           <button
             type="button"
-            className="btn-secondary provider-sync-menu-button"
+            className="btn-secondary provider-config-sync-menu-button"
             onClick={() => setCapabilityMenuOpen((current) => !current)}
             aria-expanded={capabilityMenuOpen}
-            aria-controls="provider-sync-capability-menu"
+            aria-controls="provider-config-sync-capability-menu"
           >
             Capabilities
           </button>
@@ -694,17 +694,17 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
         </div>
       </header>
 
-      <div className="provider-sync-shell">
+      <div className="provider-config-sync-shell">
         <button
           type="button"
-          className="provider-sync-menu-scrim"
+          className="provider-config-sync-menu-scrim"
           aria-label="Close capabilities menu"
           onClick={() => setCapabilityMenuOpen(false)}
         />
-        <aside className="provider-sync-sidebar" id="provider-sync-capability-menu">
-          <div className="provider-sync-sidebar-section">
-            <div className="provider-sync-label">Scope</div>
-            <div className="provider-sync-segmented">
+        <aside className="provider-config-sync-sidebar" id="provider-config-sync-capability-menu">
+          <div className="provider-config-sync-sidebar-section">
+            <div className="provider-config-sync-label">Scope</div>
+            <div className="provider-config-sync-segmented">
               {SCOPES.map((item) => (
                 <button
                   key={item}
@@ -719,15 +719,15 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
           </div>
 
           {scope === "project" && (
-            <div className="provider-sync-sidebar-section">
-              <div className="provider-sync-label">Project</div>
+            <div className="provider-config-sync-sidebar-section">
+              <div className="provider-config-sync-label">Project</div>
               <select
-                aria-label="Provider sync project"
+                aria-label="Provider Config Sync project"
                 value={selectedProjectPath}
                 onChange={(e) => {
                   setSelectedProjectPath(e.target.value);
                 }}
-                className="provider-sync-select"
+                className="provider-config-sync-select"
               >
                 <option value="">select project</option>
                 {projectOptions.map((project) => (
@@ -739,12 +739,12 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
             </div>
           )}
 
-          <div className="provider-sync-sidebar-section">
-            <div className="provider-sync-sidebar-heading">
-              <div className="provider-sync-label">Capabilities</div>
+          <div className="provider-config-sync-sidebar-section">
+            <div className="provider-config-sync-sidebar-heading">
+              <div className="provider-config-sync-label">Capabilities</div>
               <button
                 type="button"
-                className="btn-secondary provider-sync-icon-action"
+                className="btn-secondary provider-config-sync-icon-action"
                 aria-label="Add capability"
                 title="Add capability"
                 disabled={busy || providerOptions.length === 0 || (scope === "project" && !targetCwd)}
@@ -757,10 +757,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
               </button>
             </div>
             {createOpen && (
-              <div className="provider-sync-create-panel">
+              <div className="provider-config-sync-create-panel">
                 <select
                   aria-label="New capability category"
-                  className="provider-sync-select"
+                  className="provider-config-sync-select"
                   value={newCapabilityCategory}
                   onChange={(e) => setNewCapabilityCategory(e.target.value as "skill" | "agent" | "command")}
                 >
@@ -768,7 +768,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                     <option key={category.id} value={category.id}>{category.label}</option>
                   ))}
                 </select>
-                <div className="provider-sync-provider-checks" aria-label="New capability providers">
+                <div className="provider-config-sync-provider-checks" aria-label="New capability providers">
                   {providerOptions.map((provider) => (
                     <label key={provider.providerKind}>
                       <input
@@ -786,21 +786,21 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 </div>
                 <input
                   aria-label="New capability name"
-                  className="provider-sync-input"
+                  className="provider-config-sync-input"
                   value={newCapabilityName}
                   onChange={(e) => setNewCapabilityName(e.target.value)}
                   placeholder="name"
                 />
                 <input
                   aria-label="New capability description"
-                  className="provider-sync-input"
+                  className="provider-config-sync-input"
                   value={newCapabilityDescription}
                   onChange={(e) => setNewCapabilityDescription(e.target.value)}
                   placeholder="description"
                 />
                 <textarea
                   aria-label="New capability instructions"
-                  className="provider-sync-textarea provider-sync-create-instructions"
+                  className="provider-config-sync-textarea provider-config-sync-create-instructions"
                   value={newCapabilityInstructions}
                   onChange={(e) => setNewCapabilityInstructions(e.target.value)}
                   placeholder="instructions"
@@ -815,7 +815,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 </button>
               </div>
             )}
-            <div className="provider-sync-token-summary">
+            <div className="provider-config-sync-token-summary">
               <div>
                 <strong>{formatTokens(scopeTokenTotals.allTracked)}</strong>
                 <span>estimated tracked config</span>
@@ -835,29 +835,29 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 </div>
               ))}
             </div>
-            <div className="provider-sync-file-list">
+            <div className="provider-config-sync-file-list">
               {capabilityGroups.map((group) => (
                 <section
-                  className={`provider-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`}
+                  className={`provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`}
                   key={group.category}
                 >
                   <button
                     type="button"
-                    className="provider-sync-capability-group-title"
+                    className="provider-config-sync-capability-group-title"
                     aria-expanded={!collapsedGroups[group.category]}
                     onClick={() => setCollapsedGroups((current) => ({
                       ...current,
                       [group.category]: !current[group.category],
                     }))}
                   >
-                    <span className="provider-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
+                    <span className="provider-config-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
                     <span>{group.label}</span>
                     <small>{group.capabilities.length}</small>
                   </button>
                   {!collapsedGroups[group.category] && (
-                    <div className="provider-sync-capability-group-items">
+                    <div className="provider-config-sync-capability-group-items">
                       {group.capabilities.map((capability) => (
-                        <div className="provider-sync-capability-item" key={capability.id}>
+                        <div className="provider-config-sync-capability-item" key={capability.id}>
                           <button
                             type="button"
                             className={capability.id === selectedCapability?.id ? "active" : ""}
@@ -871,9 +871,9 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                               }
                             }}
                           >
-                            <span className="provider-sync-capability-name">
+                            <span className="provider-config-sync-capability-name">
                               <span
-                                className={`provider-sync-status-dot ${capabilityStatus(capability)}`}
+                                className={`provider-config-sync-status-dot ${capabilityStatus(capability)}`}
                                 aria-label={`${capabilityStatus(capability)} capability`}
                               />
                               <span>{capability.name}</span>
@@ -886,10 +886,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                             </small>
                           </button>
                           {transferCapabilityId === capability.id && (
-                            <div className="provider-sync-transfer-panel">
+                            <div className="provider-config-sync-transfer-panel">
                               {canTransferCapability(capability) ? (
                                 <>
-                                  <div className="provider-sync-segmented">
+                                  <div className="provider-config-sync-segmented">
                                     <button
                                       type="button"
                                       className={transferMode === "copy" ? "active" : ""}
@@ -907,9 +907,9 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                   </div>
                                   <select
                                     aria-label="Transfer target level"
-                                    className="provider-sync-select"
+                                    className="provider-config-sync-select"
                                     value={transferTargetScope}
-                                    onChange={(e) => setTransferTargetScope(e.target.value as ProviderSyncScope)}
+                                    onChange={(e) => setTransferTargetScope(e.target.value as ProviderConfigSyncScope)}
                                   >
                                     {SCOPES.map((item) => (
                                       <option key={item} value={item}>{item}</option>
@@ -918,7 +918,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                   {transferTargetScope === "project" && (
                                     <select
                                       aria-label="Transfer target project"
-                                      className="provider-sync-select"
+                                      className="provider-config-sync-select"
                                       value={transferTargetCwd}
                                       onChange={(e) => setTransferTargetCwd(e.target.value)}
                                     >
@@ -944,7 +944,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                   </button>
                                 </>
                               ) : (
-                                <div className="provider-sync-empty">Move/copy supports skills, subagents, and commands.</div>
+                                <div className="provider-config-sync-empty">Move/copy supports skills, subagents, and commands.</div>
                               )}
                             </div>
                           )}
@@ -955,7 +955,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 </section>
               ))}
               {capabilities.length === 0 && (
-                <div className="provider-sync-empty">
+                <div className="provider-config-sync-empty">
                   {scope === "project" && !targetCwd ? "Select a project." : "No equivalent capabilities found."}
                 </div>
               )}
@@ -963,10 +963,10 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
           </div>
         </aside>
 
-        <main className="provider-sync-main">
-          {error && <div className="provider-sync-error">{error}</div>}
+        <main className="provider-config-sync-main">
+          {error && <div className="provider-config-sync-error">{error}</div>}
           {settingsOpen && (
-            <ProviderSyncPageSettings
+            <ProviderConfigSyncPageSettings
               busy={busy}
               settings={data?.auto_settings}
               targetCwd={targetCwd}
@@ -1000,11 +1000,11 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
             />
           )}
 
-          <div className="provider-sync-editor-grid provider-sync-editor-grid-single">
-            <section className="provider-sync-editor-card provider-sync-specifics-card">
-              <div className="provider-sync-card-header">
-                <span>{selectedCapability?.name ?? "Provider Sync"}</span>
-                <div className="provider-sync-card-header-actions">
+          <div className="provider-config-sync-editor-grid provider-config-sync-editor-grid-single">
+            <section className="provider-config-sync-editor-card provider-config-sync-specifics-card">
+              <div className="provider-config-sync-card-header">
+                <span>{selectedCapability?.name ?? "Provider Config Sync"}</span>
+                <div className="provider-config-sync-card-header-actions">
                   <span>
                     {selectedCapability
                       ? `${selectedCapability.specific_count} provider files · ${formatTokens(selectedCapability.total_token_count)} est.`
@@ -1013,7 +1013,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                   {selectedCapability && (
                     <button
                       type="button"
-                      className="btn-secondary provider-sync-danger-action"
+                      className="btn-secondary provider-config-sync-danger-action"
                       disabled={
                         busy
                         || isDirty(selectedCapability.unified)
@@ -1027,9 +1027,9 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 </div>
               </div>
               {selectedCapability && unified ? (
-                <div className="provider-sync-specifics">
+                <div className="provider-config-sync-specifics">
                   {selectedCapability.specifics.length > 0 && (
-                    <div className="provider-sync-specific-tabs" role="tablist" aria-label="Provider specifics">
+                    <div className="provider-config-sync-specific-tabs" role="tablist" aria-label="Provider specifics">
                       {selectedCapability.specifics.map((specific) => {
                         const status = providerSpecificStatus(
                           specific,
@@ -1054,8 +1054,8 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                     </div>
                   )}
                   {selectedSpecific ? (
-                    <section className="provider-sync-specific" key={selectedSpecific.entry_id}>
-                      <div className="provider-sync-specific-header">
+                    <section className="provider-config-sync-specific" key={selectedSpecific.entry_id}>
+                      <div className="provider-config-sync-specific-header">
                         <div>
                           <strong>{selectedSpecific.provider_names.join(", ")}</strong>
                           <span>{selectedSpecific.exists ? selectedSpecific.label : `${selectedSpecific.label} (new)`}</span>
@@ -1065,7 +1065,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                         <small>{selectedSpecific.path}</small>
                       </div>
                       {selectedSpecific.read_error ? (
-                        <div className="provider-sync-empty">{selectedSpecific.read_error}</div>
+                        <div className="provider-config-sync-empty">{selectedSpecific.read_error}</div>
                       ) : !selectedSpecific.exists ? (
                         <StructuredMissingSpecific specific={selectedSpecific} />
                       ) : isStructuredCapability(selectedCapability) ? (
@@ -1130,7 +1130,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                 }
                                 onClick={() => void apply(selectedCapability, selectedSpecific, unified)}
                               >
-                                From {providerSyncFileDisplayName(selectedSpecific)}
+                                From {providerConfigSyncFileDisplayName(selectedSpecific)}
                               </button>
                               {unified.backup_exists && (
                                 <button
@@ -1158,7 +1158,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                 }
                                 onClick={() => void apply(selectedCapability, unified, selectedSpecific)}
                               >
-                                To {providerSyncFileDisplayName(selectedSpecific)}
+                                To {providerConfigSyncFileDisplayName(selectedSpecific)}
                               </button>
                               {selectedSpecific.backup_exists && (
                                 <button
@@ -1167,7 +1167,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                                   disabled={busy}
                                   onClick={() => void restoreFile(selectedSpecific)}
                                 >
-                                  Rollback {providerSyncFileDisplayName(selectedSpecific)}
+                                  Rollback {providerConfigSyncFileDisplayName(selectedSpecific)}
                                 </button>
                               )}
                             </>
@@ -1176,11 +1176,11 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                       )}
                     </section>
                   ) : (
-                    <div className="provider-sync-empty">No provider-specific files for this capability.</div>
+                    <div className="provider-config-sync-empty">No provider-specific files for this capability.</div>
                   )}
                 </div>
               ) : (
-                <div className="provider-sync-empty">Select a capability.</div>
+                <div className="provider-config-sync-empty">Select a capability.</div>
               )}
             </section>
           </div>
@@ -1204,10 +1204,10 @@ function StructuredSpecificView({
   onSaveSpecific,
 }: {
   busy: boolean;
-  capability: ProviderSyncCapability;
-  unified: ProviderSyncFile;
+  capability: ProviderConfigSyncCapability;
+  unified: ProviderConfigSyncFile;
   unifiedContent: string;
-  specific: ProviderSyncFile;
+  specific: ProviderConfigSyncFile;
   unifiedDirty: boolean;
   specificDirty: boolean;
   onUnifiedContentChange: (content: string) => void;
@@ -1221,7 +1221,7 @@ function StructuredSpecificView({
     const specificServers = parseMcpServers(specific.content);
     if (!specificServers) return <StructuredParseError />;
     return (
-      <div className="provider-sync-structured provider-sync-structured-specific">
+      <div className="provider-config-sync-structured provider-config-sync-structured-specific">
         <StructuredDiffSummary
           unified={unifiedServers?.map((server) => server.name) ?? []}
           specific={specificServers.map((server) => server.name)}
@@ -1229,7 +1229,7 @@ function StructuredSpecificView({
         {specificServers.map((server, index) => (
           <McpServerFields key={`${server.name}:${index}`} server={server} readOnly />
         ))}
-        {specificServers.length === 0 && <div className="provider-sync-empty">No MCP servers.</div>}
+        {specificServers.length === 0 && <div className="provider-config-sync-empty">No MCP servers.</div>}
       </div>
     );
   }
@@ -1238,7 +1238,7 @@ function StructuredSpecificView({
     const item = parseCommonItemDraft(specific.content);
     if (!unifiedItem || !item) return <StructuredParseError />;
     return (
-      <div className="provider-sync-structured provider-sync-structured-specific">
+      <div className="provider-config-sync-structured provider-config-sync-structured-specific">
         <StructuredEditableFieldDiffs
           busy={busy}
           unified={unified}
@@ -1258,7 +1258,7 @@ function StructuredSpecificView({
   return null;
 }
 
-function ProviderSyncPageSettings({
+function ProviderConfigSyncPageSettings({
   busy,
   settings,
   targetCwd,
@@ -1274,17 +1274,17 @@ function ProviderSyncPageSettings({
   onFixHunk,
 }: {
   busy: boolean;
-  settings: ProviderSyncAutoSettings | undefined;
+  settings: ProviderConfigSyncAutoSettings | undefined;
   targetCwd: string;
-  capability: ProviderSyncCapability | undefined;
-  specific: ProviderSyncFile | undefined;
-  effectivePolicy: ProviderSyncAutoPolicy;
-  log: ProviderSyncAutoResponse | null;
+  capability: ProviderConfigSyncCapability | undefined;
+  specific: ProviderConfigSyncFile | undefined;
+  effectivePolicy: ProviderConfigSyncAutoPolicy;
+  log: ProviderConfigSyncAutoResponse | null;
   canFixSelectedProvider: boolean;
   canFixCapability: boolean;
   onSave: (
-    level: ProviderSyncAutoSettingsLevel,
-    policy: ProviderSyncAutoPolicy | Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode>,
+    level: ProviderConfigSyncAutoSettingsLevel,
+    policy: ProviderConfigSyncAutoPolicy | Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode>,
   ) => void;
   onFixSelectedProvider: () => void;
   onFixCapability: () => void;
@@ -1293,24 +1293,24 @@ function ProviderSyncPageSettings({
   const capabilityId = capability?.capability_id ?? "";
   const projectSettings = targetCwd ? settings?.projects?.[targetCwd] : undefined;
   return (
-    <section className="provider-sync-settings-panel" aria-label="Provider Sync settings">
-      <div className="provider-sync-settings-head">
+    <section className="provider-config-sync-settings-panel" aria-label="Provider Config Sync settings">
+      <div className="provider-config-sync-settings-head">
         <div>
           <strong>Settings</strong>
           <span>{capability?.name ?? "No capability selected"}</span>
         </div>
-        <div className="provider-sync-settings-effective">
+        <div className="provider-config-sync-settings-effective">
           {AUTO_OPERATIONS.map((operation) => (
             <span key={operation.id}>{operation.label}: {effectivePolicy[operation.id]}</span>
           ))}
         </div>
       </div>
-      <div className="provider-sync-settings-grid">
+      <div className="provider-config-sync-settings-grid">
         <AutoPolicyEditor
           title="Global"
           policy={{ ...DEFAULT_AUTO_POLICY, ...(settings?.global ?? {}) }}
           disabled={busy}
-          onChange={(policy) => onSave("global", policy as ProviderSyncAutoPolicy)}
+          onChange={(policy) => onSave("global", policy as ProviderConfigSyncAutoPolicy)}
         />
         <AutoPolicyEditor
           title="Capability"
@@ -1334,7 +1334,7 @@ function ProviderSyncPageSettings({
           onChange={(policy) => onSave("project_capability", policy)}
         />
       </div>
-      <div className="provider-sync-settings-actions">
+      <div className="provider-config-sync-settings-actions">
         <button
           type="button"
           className="btn-secondary"
@@ -1353,20 +1353,20 @@ function ProviderSyncPageSettings({
         </button>
       </div>
       {specific && (
-        <div className="provider-sync-settings-target">
+        <div className="provider-config-sync-settings-target">
           <span>Selected provider</span>
           <strong>{specific.provider_names.join(", ")}</strong>
         </div>
       )}
       {log && (
-        <div className="provider-sync-auto-log">
-          <div className="provider-sync-auto-log-head">
+        <div className="provider-config-sync-auto-log">
+          <div className="provider-config-sync-auto-log-head">
             <strong>{log.applied_count} applied</strong>
             <strong>{log.pending_count} pending</strong>
             <span>{log.skipped_count} skipped</span>
           </div>
           {log.log_head.map((item) => (
-            <div className={`provider-sync-auto-log-row ${item.status}`} key={item.hunk_id}>
+            <div className={`provider-config-sync-auto-log-row ${item.status}`} key={item.hunk_id}>
               <div>
                 <strong>{item.operation}</strong>
                 <span>{item.status} · {item.row_count} rows</span>
@@ -1398,14 +1398,14 @@ function AutoPolicyEditor({
   onChange,
 }: {
   title: string;
-  policy: Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode>;
+  policy: Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode>;
   disabled: boolean;
   allowInherit?: boolean;
-  onChange: (policy: Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode>) => void;
+  onChange: (policy: Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode>) => void;
 }) {
   const options = allowInherit ? [{ id: "inherit", label: "Inherit" }, ...AUTO_MODES] : AUTO_MODES;
   return (
-    <div className="provider-sync-settings-card">
+    <div className="provider-config-sync-settings-card">
       <strong>{title}</strong>
       {AUTO_OPERATIONS.map((operation) => (
         <label key={operation.id}>
@@ -1414,7 +1414,7 @@ function AutoPolicyEditor({
             aria-label={`${title} ${operation.label}`}
             value={policy[operation.id]}
             disabled={disabled}
-            onChange={(e) => onChange({ ...policy, [operation.id]: e.target.value as ProviderSyncAutoOverrideMode })}
+            onChange={(e) => onChange({ ...policy, [operation.id]: e.target.value as ProviderConfigSyncAutoOverrideMode })}
           >
             {options.map((mode) => (
               <option key={mode.id} value={mode.id}>{mode.label}</option>
@@ -1446,8 +1446,8 @@ function EditableAlignedFileDiff({
   specificHeaderActions,
 }: {
   busy: boolean;
-  unified: ProviderSyncFile;
-  specific: ProviderSyncFile;
+  unified: ProviderConfigSyncFile;
+  specific: ProviderConfigSyncFile;
   debouncedUnifiedContent: string;
   debouncedSpecificContent: string;
   unifiedDirty: boolean;
@@ -1465,7 +1465,7 @@ function EditableAlignedFileDiff({
 }) {
   return (
     <AlignedDiffView
-      className="provider-sync-specific-content"
+      className="provider-config-sync-specific-content"
       leftLabel="Unified"
       rightLabel={specific.provider_names.join(", ")}
       leftPath={unified.path}
@@ -1561,7 +1561,7 @@ function EditableDiffCell({
     return (
       <div className={cellClassName}>
         <pre
-          className="provider-sync-aligned-diff-cell-text"
+          className="provider-config-sync-aligned-diff-cell-text"
           tabIndex={writable ? 0 : undefined}
           onDoubleClick={() => {
             if (writable) onActivate(editorKey);
@@ -1583,7 +1583,7 @@ function EditableDiffCell({
       <textarea
         ref={editorRef}
         aria-label={`${label} line ${lineNumber ?? fallbackIndex + 1}`}
-        className="provider-sync-aligned-diff-cell-editor"
+        className="provider-config-sync-aligned-diff-cell-editor"
         defaultValue={text}
         readOnly={!writable}
         rows={rows}
@@ -1607,7 +1607,7 @@ function diffCellTone(row: AlignedDiffRow, side: "left" | "right"): "same" | "ch
 
 function diffCellClassName(row: AlignedDiffRow, side: "left" | "right"): string {
   const tone = diffCellTone(row, side);
-  return `provider-sync-diff-cell provider-sync-diff-cell-${side} ${tone}`;
+  return `provider-config-sync-diff-cell provider-config-sync-diff-cell-${side} ${tone}`;
 }
 
 function editableDiffRowKey(row: AlignedDiffRow, fallbackIndex: number): string {
@@ -1655,13 +1655,13 @@ function DiffHeaderSide({
   actions?: ReactNode;
 }) {
   return (
-    <div className="provider-sync-aligned-diff-header-side">
+    <div className="provider-config-sync-aligned-diff-header-side">
       <div>
         <span>{label}</span>
         {path && <small>{path}</small>}
       </div>
       {(dirty || actions) && (
-        <div className="provider-sync-aligned-diff-header-actions">
+        <div className="provider-config-sync-aligned-diff-header-actions">
           {actions}
           {dirty && (
             <button
@@ -1694,13 +1694,13 @@ function DiffBlockControls({
 }) {
   const changedCount = counts.added + counts.removed + counts.changed;
   return (
-    <div className="provider-sync-aligned-diff-block-controls">
+    <div className="provider-config-sync-aligned-diff-block-controls">
       <strong>{changedCount === 0 ? "Aligned" : diffCountsLabel(counts)}</strong>
       {editable && changedCount > 0 && (
         <div>
           <button
             type="button"
-            className="btn-secondary provider-sync-next-diff-button"
+            className="btn-secondary provider-config-sync-next-diff-button"
             onClick={onNextDiff}
           >
             Next diff
@@ -1733,7 +1733,7 @@ function ArrowApplyButton({
   return (
     <button
       type="button"
-      className="btn-secondary provider-sync-diff-arrow-button"
+      className="btn-secondary provider-config-sync-diff-arrow-button"
       aria-label={label}
       title={label}
       onClick={onClick}
@@ -1745,12 +1745,12 @@ function ArrowApplyButton({
 
 function DiffHeaderLabel({ label, path, actions }: { label: string; path?: string; actions?: ReactNode }) {
   return (
-    <div className="provider-sync-aligned-diff-header-side">
+    <div className="provider-config-sync-aligned-diff-header-side">
       <div>
         <span>{label}</span>
         {path && <small>{path}</small>}
       </div>
-      {actions && <div className="provider-sync-aligned-diff-header-actions">{actions}</div>}
+      {actions && <div className="provider-config-sync-aligned-diff-header-actions">{actions}</div>}
     </div>
   );
 }
@@ -1824,8 +1824,8 @@ function AlignedDiffView({
   }, []);
 
   return (
-    <div className={`${className ? `${className} ` : ""}provider-sync-aligned-diff`}>
-      <div className="provider-sync-aligned-diff-header">
+    <div className={`${className ? `${className} ` : ""}provider-config-sync-aligned-diff`}>
+      <div className="provider-config-sync-aligned-diff-header">
         {editable ? (
           <DiffHeaderSide
             label={leftLabel}
@@ -1860,21 +1860,21 @@ function AlignedDiffView({
           <DiffHeaderLabel label={rightLabel} path={rightPath} actions={rightHeaderActions} />
         )}
       </div>
-      <div className="provider-sync-aligned-diff-body">
+      <div className="provider-config-sync-aligned-diff-body">
         {rows.map((row, index) => {
           const hunk = hunkByFirstRow.get(row.key);
           const changed = row.kind !== "same";
           const renderKey = editable ? editableDiffRowKey(row, index) : row.key;
           return (
             <div
-              className={`provider-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`}
+              className={`provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`}
               key={renderKey}
               ref={(node) => {
                 if (changed) registerDiffRow(row.key, node);
               }}
             >
               {editable && hunk && (
-                <div className="provider-sync-aligned-diff-hunk-controls">
+                <div className="provider-config-sync-aligned-diff-hunk-controls">
                   <span>Hunk</span>
                   <ArrowApplyButton
                     direction="left"
@@ -1888,8 +1888,8 @@ function AlignedDiffView({
                   />
                 </div>
               )}
-              <div className={`provider-sync-aligned-diff-row ${row.kind}${editable ? " editable" : ""}`}>
-                <span className="provider-sync-line-number">{row.unifiedLine ?? ""}</span>
+              <div className={`provider-config-sync-aligned-diff-row ${row.kind}${editable ? " editable" : ""}`}>
+                <span className="provider-config-sync-line-number">{row.unifiedLine ?? ""}</span>
                 {editable ? (
                   <EditableDiffCell
                     editorKey={`${renderKey}:left`}
@@ -1910,7 +1910,7 @@ function AlignedDiffView({
                   </div>
                 )}
                 {editable && (
-                  <div className="provider-sync-aligned-diff-line-controls">
+                  <div className="provider-config-sync-aligned-diff-line-controls">
                     {row.kind !== "same" && (
                       <>
                         <ArrowApplyButton
@@ -1927,7 +1927,7 @@ function AlignedDiffView({
                     )}
                   </div>
                 )}
-                <span className="provider-sync-line-number">{row.specificLine ?? ""}</span>
+                <span className="provider-config-sync-line-number">{row.specificLine ?? ""}</span>
                 {editable ? (
                   <EditableDiffCell
                     editorKey={`${renderKey}:right`}
@@ -1956,9 +1956,9 @@ function AlignedDiffView({
   );
 }
 
-function StructuredMissingSpecific({ specific }: { specific: ProviderSyncFile }) {
+function StructuredMissingSpecific({ specific }: { specific: ProviderConfigSyncFile }) {
   return (
-    <div className="provider-sync-empty">
+    <div className="provider-config-sync-empty">
       <div>Not configured yet.</div>
       <small>Apply unified to create {specific.label}.</small>
     </div>
@@ -1978,8 +1978,8 @@ function McpServerFields({
 }) {
   const set = (patch: Partial<McpServerDraft>) => onChange?.({ ...server, ...patch });
   return (
-    <div className="provider-sync-item-card">
-      <div className="provider-sync-item-title">
+    <div className="provider-config-sync-item-card">
+      <div className="provider-config-sync-item-title">
         <input
           value={server.name}
           onChange={(e) => set({ name: e.target.value })}
@@ -2016,10 +2016,10 @@ function StructuredDiffSummary({ unified, specific }: { unified: string[]; speci
   const added = specific.filter((item) => !unified.includes(item));
   const missing = unified.filter((item) => !specific.includes(item));
   if (added.length === 0 && missing.length === 0) {
-    return <div className="provider-sync-structured-diff ok">Same item names as unified.</div>;
+    return <div className="provider-config-sync-structured-diff ok">Same item names as unified.</div>;
   }
   return (
-    <div className="provider-sync-structured-diff">
+    <div className="provider-config-sync-structured-diff">
       {missing.length > 0 && <span>Missing: {missing.join(", ")}</span>}
       {added.length > 0 && <span>Only here: {added.join(", ")}</span>}
     </div>
@@ -2048,8 +2048,8 @@ function StructuredEditableFieldDiffs({
   onSaveSpecific,
 }: {
   busy: boolean;
-  unified: ProviderSyncFile;
-  specific: ProviderSyncFile;
+  unified: ProviderConfigSyncFile;
+  specific: ProviderConfigSyncFile;
   unifiedItem: CommonItemDraft;
   specificItem: CommonItemDraft;
   unifiedDirty: boolean;
@@ -2099,10 +2099,10 @@ function StructuredEditableFieldDiffs({
   };
 
   return (
-    <div className="provider-sync-structured-field-diffs">
+    <div className="provider-config-sync-structured-field-diffs">
       {COMMON_ITEM_FIELDS.map(({ field, label }) => (
-        <section className="provider-sync-structured-field-diff" key={label}>
-          <div className="provider-sync-structured-field-diff-title">{label}</div>
+        <section className="provider-config-sync-structured-field-diff" key={label}>
+          <div className="provider-config-sync-structured-field-diff-title">{label}</div>
           <AlignedDiffView
             leftLabel="Unified"
             rightLabel={specific.provider_names.join(", ")}
@@ -2137,5 +2137,5 @@ function StructuredEditableFieldDiffs({
 }
 
 function StructuredParseError() {
-  return <div className="provider-sync-empty">This item needs a valid converted shape before it can be shown here.</div>;
+  return <div className="provider-config-sync-empty">This item needs a valid converted shape before it can be shown here.</div>;
 }

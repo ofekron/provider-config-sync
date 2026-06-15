@@ -24495,7 +24495,7 @@
   var import_react2 = __toESM(require_react(), 1);
   var import_client = __toESM(require_client(), 1);
 
-  // src/ProviderSyncPage.tsx
+  // src/ProviderConfigSyncPage.tsx
   var import_react = __toESM(require_react(), 1);
 
   // ../provider-config-sync-core/dist/diff.js
@@ -24693,7 +24693,7 @@
     });
   }
 
-  // src/ProviderSyncPage.tsx
+  // src/ProviderConfigSyncPage.tsx
   var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
   var SCOPES = ["global", "project"];
   var CATEGORY_LABELS = {
@@ -24774,7 +24774,7 @@
     if (capability.missing_count > 0) return "missing";
     return capability.has_diffs ? "diff" : "aligned";
   }
-  function collectProviderSyncContents(body) {
+  function collectProviderConfigSyncContents(body) {
     const contents = {};
     for (const file of body.files) contents[file.entry_id] = file.content;
     for (const capabilities of Object.values(body.groups)) {
@@ -24794,7 +24794,7 @@
     }
     return merged;
   }
-  function providerSyncFileDisplayName(file) {
+  function providerConfigSyncFileDisplayName(file) {
     return file.provider_names.length > 0 ? file.provider_names.join(", ") : file.label;
   }
   function shouldConfirmApplyTargetOverwrite(target) {
@@ -24803,7 +24803,7 @@
   function canTransferCapability(capability) {
     return capability.category === "skill" || capability.category === "agent" || capability.category === "command";
   }
-  function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }) {
+  function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }) {
     const [data, setData] = (0, import_react.useState)(null);
     const [projects, setProjects] = (0, import_react.useState)([]);
     const [scope, setScope] = (0, import_react.useState)("project");
@@ -24856,7 +24856,7 @@
         if (sequence !== fetchSequence.current) return;
         setData(body);
         const previousContents = latestContents.current;
-        const nextContents = collectProviderSyncContents(body);
+        const nextContents = collectProviderConfigSyncContents(body);
         setDrafts((current) => mergeFetchedDrafts(current, previousContents, nextContents));
         setDebouncedDrafts((current) => mergeFetchedDrafts(current, previousContents, nextContents));
         latestContents.current = nextContents;
@@ -25008,7 +25008,7 @@
       if (content !== file.content) void saveFileContent(file, content);
     }, [saveFileContent, updateDraft]);
     const restoreFile = (0, import_react.useCallback)(async (file) => {
-      if (!window.confirm(`Restore ${providerSyncFileDisplayName(file)} from its Provider Sync backup?`)) return;
+      if (!window.confirm(`Restore ${providerConfigSyncFileDisplayName(file)} from its Provider Config Sync backup?`)) return;
       setBusy(true);
       try {
         const body = {
@@ -25143,7 +25143,7 @@
       transferTargetEffectiveCwd
     ]);
     const apply = (0, import_react.useCallback)(async (capability, source, target) => {
-      if (shouldConfirmApplyTargetOverwrite(target) && !window.confirm(`This will overwrite existing content in ${providerSyncFileDisplayName(target)}. Continue?`)) {
+      if (shouldConfirmApplyTargetOverwrite(target) && !window.confirm(`This will overwrite existing content in ${providerConfigSyncFileDisplayName(target)}. Continue?`)) {
         return;
       }
       setBusy(true);
@@ -25235,25 +25235,25 @@
       setCapabilityMenuOpen(false);
       setTransferCapabilityId("");
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-sync-page${capabilityMenuOpen ? " menu-open" : ""}`, "data-testid": "provider-sync-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "provider-sync-topbar", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}`, "data-testid": "provider-config-sync-page", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "provider-config-sync-topbar", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: "Provider Sync" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-subtitle", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: "Provider Config Sync" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-subtitle", children: [
             scope,
             selectedCapability ? ` \xB7 ${selectedCapability.name}` : "",
             selectedCapability ? ` \xB7 ${formatTokens(selectedCapability.total_token_count)} est.` : ""
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-topbar-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-topbar-actions", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
             "button",
             {
               type: "button",
-              className: "btn-secondary provider-sync-menu-button",
+              className: "btn-secondary provider-config-sync-menu-button",
               onClick: () => setCapabilityMenuOpen((current) => !current),
               "aria-expanded": capabilityMenuOpen,
-              "aria-controls": "provider-sync-capability-menu",
+              "aria-controls": "provider-config-sync-capability-menu",
               children: "Capabilities"
             }
           ),
@@ -25270,20 +25270,20 @@
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-secondary", onClick: onClose, disabled: busy, children: "Close" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-shell", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-shell", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
-            className: "provider-sync-menu-scrim",
+            className: "provider-config-sync-menu-scrim",
             "aria-label": "Close capabilities menu",
             onClick: () => setCapabilityMenuOpen(false)
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "provider-sync-sidebar", id: "provider-sync-capability-menu", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-label", children: "Scope" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-segmented", children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "provider-config-sync-sidebar", id: "provider-config-sync-capability-menu", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Scope" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-segmented", children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
               {
                 type: "button",
@@ -25294,8 +25294,8 @@
               item
             )) })
           ] }),
-          scope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-label", children: "Project" }),
+          scope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Project" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "select",
               {
@@ -25304,7 +25304,7 @@
                 onChange: (e) => {
                   setSelectedProjectPath(e.target.value);
                 },
-                className: "provider-sync-select",
+                className: "provider-config-sync-select",
                 children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "select project" }),
                   projectOptions.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: project.path, children: [
@@ -25316,14 +25316,14 @@
               }
             )
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-sidebar-heading", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-label", children: "Capabilities" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-heading", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Capabilities" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "btn-secondary provider-sync-icon-action",
+                  className: "btn-secondary provider-config-sync-icon-action",
                   "aria-label": "Add capability",
                   title: "Add capability",
                   disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
@@ -25335,18 +25335,18 @@
                 }
               )
             ] }),
-            createOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-create-panel", children: [
+            createOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-create-panel", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "select",
                 {
                   "aria-label": "New capability category",
-                  className: "provider-sync-select",
+                  className: "provider-config-sync-select",
                   value: newCapabilityCategory,
                   onChange: (e) => setNewCapabilityCategory(e.target.value),
                   children: CREATE_CAPABILITY_CATEGORIES.map((category) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: category.id, children: category.label }, category.id))
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-provider-checks", "aria-label": "New capability providers", children: providerOptions.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-provider-checks", "aria-label": "New capability providers", children: providerOptions.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "input",
                   {
@@ -25361,7 +25361,7 @@
                 "input",
                 {
                   "aria-label": "New capability name",
-                  className: "provider-sync-input",
+                  className: "provider-config-sync-input",
                   value: newCapabilityName,
                   onChange: (e) => setNewCapabilityName(e.target.value),
                   placeholder: "name"
@@ -25371,7 +25371,7 @@
                 "input",
                 {
                   "aria-label": "New capability description",
-                  className: "provider-sync-input",
+                  className: "provider-config-sync-input",
                   value: newCapabilityDescription,
                   onChange: (e) => setNewCapabilityDescription(e.target.value),
                   placeholder: "description"
@@ -25381,7 +25381,7 @@
                 "textarea",
                 {
                   "aria-label": "New capability instructions",
-                  className: "provider-sync-textarea provider-sync-create-instructions",
+                  className: "provider-config-sync-textarea provider-config-sync-create-instructions",
                   value: newCapabilityInstructions,
                   onChange: (e) => setNewCapabilityInstructions(e.target.value),
                   placeholder: "instructions"
@@ -25398,7 +25398,7 @@
                 }
               )
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-token-summary", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-token-summary", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.allTracked) }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "estimated tracked config" })
@@ -25416,30 +25416,30 @@
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(item.tokenCount) })
               ] }, item.providerKind))
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-file-list", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-file-list", children: [
               capabilityGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                 "section",
                 {
-                  className: `provider-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
+                  className: `provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                       "button",
                       {
                         type: "button",
-                        className: "provider-sync-capability-group-title",
+                        className: "provider-config-sync-capability-group-title",
                         "aria-expanded": !collapsedGroups[group.category],
                         onClick: () => setCollapsedGroups((current) => ({
                           ...current,
                           [group.category]: !current[group.category]
                         })),
                         children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
+                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
                         ]
                       }
                     ),
-                    !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-capability-item", children: [
+                    !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-item", children: [
                       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                         "button",
                         {
@@ -25455,11 +25455,11 @@
                             }
                           },
                           children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "provider-sync-capability-name", children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "provider-config-sync-capability-name", children: [
                               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                                 "span",
                                 {
-                                  className: `provider-sync-status-dot ${capabilityStatus(capability)}`,
+                                  className: `provider-config-sync-status-dot ${capabilityStatus(capability)}`,
                                   "aria-label": `${capabilityStatus(capability)} capability`
                                 }
                               ),
@@ -25475,8 +25475,8 @@
                           ]
                         }
                       ),
-                      transferCapabilityId === capability.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-transfer-panel", children: canTransferCapability(capability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-segmented", children: [
+                      transferCapabilityId === capability.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-transfer-panel", children: canTransferCapability(capability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-segmented", children: [
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                             "button",
                             {
@@ -25500,7 +25500,7 @@
                           "select",
                           {
                             "aria-label": "Transfer target level",
-                            className: "provider-sync-select",
+                            className: "provider-config-sync-select",
                             value: transferTargetScope,
                             onChange: (e) => setTransferTargetScope(e.target.value),
                             children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: item, children: item }, item))
@@ -25510,7 +25510,7 @@
                           "select",
                           {
                             "aria-label": "Transfer target project",
-                            className: "provider-sync-select",
+                            className: "provider-config-sync-select",
                             value: transferTargetCwd,
                             onChange: (e) => setTransferTargetCwd(e.target.value),
                             children: [
@@ -25533,20 +25533,20 @@
                             children: transferMode === "copy" ? "Copy capability" : "Move capability"
                           }
                         )
-                      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: "Move/copy supports skills, subagents, and commands." }) })
+                      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "Move/copy supports skills, subagents, and commands." }) })
                     ] }, capability.id)) })
                   ]
                 },
                 group.category
               )),
-              capabilities.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: scope === "project" && !targetCwd ? "Select a project." : "No equivalent capabilities found." })
+              capabilities.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: scope === "project" && !targetCwd ? "Select a project." : "No equivalent capabilities found." })
             ] })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { className: "provider-sync-main", children: [
-          error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-error", children: error }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { className: "provider-config-sync-main", children: [
+          error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-error", children: error }),
           settingsOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            ProviderSyncPageSettings,
+            ProviderConfigSyncPageSettings,
             {
               busy,
               settings: data?.auto_settings,
@@ -25563,16 +25563,16 @@
               onFixHunk: (hunkId) => void llmFixHunk(hunkId)
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-editor-grid provider-sync-editor-grid-single", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-editor-card provider-sync-specifics-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-card-header", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedCapability?.name ?? "Provider Sync" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-card-header-actions", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-editor-grid provider-config-sync-editor-grid-single", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-config-sync-editor-card provider-config-sync-specifics-card", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-card-header", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedCapability?.name ?? "Provider Config Sync" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-card-header-actions", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedCapability ? `${selectedCapability.specific_count} provider files \xB7 ${formatTokens(selectedCapability.total_token_count)} est.` : "none" }),
                 selectedCapability && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "button",
                   {
                     type: "button",
-                    className: "btn-secondary provider-sync-danger-action",
+                    className: "btn-secondary provider-config-sync-danger-action",
                     disabled: busy || isDirty(selectedCapability.unified) || selectedCapability.specifics.some((specific) => isDirty(specific)),
                     onClick: () => void deleteCapability(selectedCapability),
                     children: "Remove capability"
@@ -25580,8 +25580,8 @@
                 )
               ] })
             ] }),
-            selectedCapability && unified ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-specifics", children: [
-              selectedCapability.specifics.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-specific-tabs", role: "tablist", "aria-label": "Provider specifics", children: selectedCapability.specifics.map((specific) => {
+            selectedCapability && unified ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-specifics", children: [
+              selectedCapability.specifics.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-specific-tabs", role: "tablist", "aria-label": "Provider specifics", children: selectedCapability.specifics.map((specific) => {
                 const status = providerSpecificStatus(
                   specific,
                   debouncedDraftFor(unified),
@@ -25607,8 +25607,8 @@
                   specific.entry_id
                 );
               }) }),
-              selectedSpecific ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-specific", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-specific-header", children: [
+              selectedSpecific ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-config-sync-specific", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-specific-header", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: selectedSpecific.provider_names.join(", ") }),
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedSpecific.exists ? selectedSpecific.label : `${selectedSpecific.label} (new)` }),
@@ -25620,7 +25620,7 @@
                   ] }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: selectedSpecific.path })
                 ] }),
-                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific: selectedSpecific }) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific: selectedSpecific }) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   StructuredSpecificView,
                   {
                     busy,
@@ -25680,7 +25680,7 @@
                           onClick: () => void apply(selectedCapability, selectedSpecific, unified),
                           children: [
                             "From ",
-                            providerSyncFileDisplayName(selectedSpecific)
+                            providerConfigSyncFileDisplayName(selectedSpecific)
                           ]
                         }
                       ),
@@ -25705,7 +25705,7 @@
                           onClick: () => void apply(selectedCapability, unified, selectedSpecific),
                           children: [
                             "To ",
-                            providerSyncFileDisplayName(selectedSpecific)
+                            providerConfigSyncFileDisplayName(selectedSpecific)
                           ]
                         }
                       ),
@@ -25718,15 +25718,15 @@
                           onClick: () => void restoreFile(selectedSpecific),
                           children: [
                             "Rollback ",
-                            providerSyncFileDisplayName(selectedSpecific)
+                            providerConfigSyncFileDisplayName(selectedSpecific)
                           ]
                         }
                       )
                     ] })
                   }
                 )
-              ] }, selectedSpecific.entry_id) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: "No provider-specific files for this capability." })
-            ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: "Select a capability." })
+              ] }, selectedSpecific.entry_id) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "No provider-specific files for this capability." })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "Select a capability." })
           ] }) })
         ] })
       ] })
@@ -25750,7 +25750,7 @@
       const unifiedServers = parseMcpServers(unifiedContent);
       const specificServers = parseMcpServers(specific.content);
       if (!specificServers) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredParseError, {});
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-structured provider-sync-structured-specific", children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-structured provider-config-sync-structured-specific", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           StructuredDiffSummary,
           {
@@ -25759,14 +25759,14 @@
           }
         ),
         specificServers.map((server, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(McpServerFields, { server, readOnly: true }, `${server.name}:${index}`)),
-        specificServers.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: "No MCP servers." })
+        specificServers.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "No MCP servers." })
       ] });
     }
     if (capability.category === "agent" || capability.category === "skill" || capability.category === "command") {
       const unifiedItem = parseCommonItemDraft(unifiedContent);
       const item = parseCommonItemDraft(specific.content);
       if (!unifiedItem || !item) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredParseError, {});
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured provider-sync-structured-specific", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-structured provider-config-sync-structured-specific", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         StructuredEditableFieldDiffs,
         {
           busy,
@@ -25785,7 +25785,7 @@
     }
     return null;
   }
-  function ProviderSyncPageSettings({
+  function ProviderConfigSyncPageSettings({
     busy,
     settings,
     targetCwd,
@@ -25802,19 +25802,19 @@
   }) {
     const capabilityId = capability?.capability_id ?? "";
     const projectSettings = targetCwd ? settings?.projects?.[targetCwd] : void 0;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-settings-panel", "aria-label": "Provider Sync settings", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-settings-head", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-config-sync-settings-panel", "aria-label": "Provider Config Sync settings", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-settings-head", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Settings" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: capability?.name ?? "No capability selected" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-settings-effective", children: AUTO_OPERATIONS.map((operation) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-settings-effective", children: AUTO_OPERATIONS.map((operation) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           operation.label,
           ": ",
           effectivePolicy[operation.id]
         ] }, operation.id)) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-settings-grid", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-settings-grid", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           AutoPolicyEditor,
           {
@@ -25855,7 +25855,7 @@
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-settings-actions", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-settings-actions", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
@@ -25877,12 +25877,12 @@
           }
         )
       ] }),
-      specific && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-settings-target", children: [
+      specific && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-settings-target", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Selected provider" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: specific.provider_names.join(", ") })
       ] }),
-      log && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-auto-log", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-auto-log-head", children: [
+      log && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-auto-log", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-auto-log-head", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: [
             log.applied_count,
             " applied"
@@ -25896,7 +25896,7 @@
             " skipped"
           ] })
         ] }),
-        log.log_head.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-sync-auto-log-row ${item.status}`, children: [
+        log.log_head.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-config-sync-auto-log-row ${item.status}`, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.operation }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
@@ -25929,7 +25929,7 @@
     onChange
   }) {
     const options = allowInherit ? [{ id: "inherit", label: "Inherit" }, ...AUTO_MODES] : AUTO_MODES;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-settings-card", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-settings-card", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: title }),
       AUTO_OPERATIONS.map((operation) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: operation.label }),
@@ -25968,7 +25968,7 @@
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       AlignedDiffView,
       {
-        className: "provider-sync-specific-content",
+        className: "provider-config-sync-specific-content",
         leftLabel: "Unified",
         rightLabel: specific.provider_names.join(", "),
         leftPath: unified.path,
@@ -26032,7 +26032,7 @@
       return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: cellClassName, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "pre",
         {
-          className: "provider-sync-aligned-diff-cell-text",
+          className: "provider-config-sync-aligned-diff-cell-text",
           tabIndex: writable ? 0 : void 0,
           onDoubleClick: () => {
             if (writable) onActivate(editorKey);
@@ -26051,7 +26051,7 @@
       {
         ref: editorRef,
         "aria-label": `${label} line ${lineNumber ?? fallbackIndex + 1}`,
-        className: "provider-sync-aligned-diff-cell-editor",
+        className: "provider-config-sync-aligned-diff-cell-editor",
         defaultValue: text,
         readOnly: !writable,
         rows,
@@ -26072,7 +26072,7 @@
   }
   function diffCellClassName(row, side) {
     const tone = diffCellTone(row, side);
-    return `provider-sync-diff-cell provider-sync-diff-cell-${side} ${tone}`;
+    return `provider-config-sync-diff-cell provider-config-sync-diff-cell-${side} ${tone}`;
   }
   function editableDiffRowKey(row, fallbackIndex) {
     const unifiedKey = row.unifiedLine === null ? `u-new-${fallbackIndex}` : `u-${row.unifiedLine}`;
@@ -26107,12 +26107,12 @@
     onSave,
     actions
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-header-side", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-header-side", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: label }),
         path && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: path })
       ] }),
-      (dirty || actions) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-header-actions", children: [
+      (dirty || actions) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-header-actions", children: [
         actions,
         dirty && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           "button",
@@ -26138,14 +26138,14 @@
     onNextDiff
   }) {
     const changedCount = counts.added + counts.removed + counts.changed;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-block-controls", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-block-controls", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: changedCount === 0 ? "Aligned" : diffCountsLabel(counts) }),
       editable && changedCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
-            className: "btn-secondary provider-sync-next-diff-button",
+            className: "btn-secondary provider-config-sync-next-diff-button",
             onClick: onNextDiff,
             children: "Next diff"
           }
@@ -26178,7 +26178,7 @@
       "button",
       {
         type: "button",
-        className: "btn-secondary provider-sync-diff-arrow-button",
+        className: "btn-secondary provider-config-sync-diff-arrow-button",
         "aria-label": label,
         title: label,
         onClick,
@@ -26187,12 +26187,12 @@
     );
   }
   function DiffHeaderLabel({ label, path, actions }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-header-side", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-header-side", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: label }),
         path && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: path })
       ] }),
-      actions && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-aligned-diff-header-actions", children: actions })
+      actions && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-aligned-diff-header-actions", children: actions })
     ] });
   }
   function AlignedDiffView({
@@ -26247,8 +26247,8 @@
     const deactivateEditor = (0, import_react.useCallback)((key) => {
       setActiveEditorKey((current) => current === key ? null : current);
     }, []);
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `${className ? `${className} ` : ""}provider-sync-aligned-diff`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-header", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `${className ? `${className} ` : ""}provider-config-sync-aligned-diff`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-header", children: [
         editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           DiffHeaderSide,
           {
@@ -26284,19 +26284,19 @@
           }
         ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DiffHeaderLabel, { label: rightLabel, path: rightPath, actions: rightHeaderActions })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-aligned-diff-body", children: rows.map((row, index) => {
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-aligned-diff-body", children: rows.map((row, index) => {
         const hunk = hunkByFirstRow.get(row.key);
         const changed = row.kind !== "same";
         const renderKey = editable ? editableDiffRowKey(row, index) : row.key;
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           "div",
           {
-            className: `provider-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`,
+            className: `provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`,
             ref: (node) => {
               if (changed) registerDiffRow(row.key, node);
             },
             children: [
-              editable && hunk && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-hunk-controls", children: [
+              editable && hunk && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-hunk-controls", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Hunk" }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   ArrowApplyButton,
@@ -26315,8 +26315,8 @@
                   }
                 )
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-sync-aligned-diff-row ${row.kind}${editable ? " editable" : ""}`, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-sync-line-number", children: row.unifiedLine ?? "" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-config-sync-aligned-diff-row ${row.kind}${editable ? " editable" : ""}`, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-line-number", children: row.unifiedLine ?? "" }),
                 editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableDiffCell,
                   {
@@ -26333,7 +26333,7 @@
                     onChange: editable.onChangeLeft
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: diffCellClassName(row, "left"), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: row.unifiedText }) }),
-                editable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-aligned-diff-line-controls", children: row.kind !== "same" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+                editable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-aligned-diff-line-controls", children: row.kind !== "same" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                     ArrowApplyButton,
                     {
@@ -26351,7 +26351,7 @@
                     }
                   )
                 ] }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-sync-line-number", children: row.specificLine ?? "" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-line-number", children: row.specificLine ?? "" }),
                 editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableDiffCell,
                   {
@@ -26377,7 +26377,7 @@
     ] });
   }
   function StructuredMissingSpecific({ specific }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-empty", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-empty", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "Not configured yet." }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
         "Apply unified to create ",
@@ -26393,8 +26393,8 @@
     onRemove
   }) {
     const set = (patch) => onChange?.({ ...server, ...patch });
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-item-card", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-item-title", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-item-card", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-item-title", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "input",
           {
@@ -26428,9 +26428,9 @@
     const added = specific.filter((item) => !unified.includes(item));
     const missing = unified.filter((item) => !specific.includes(item));
     if (added.length === 0 && missing.length === 0) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-diff ok", children: "Same item names as unified." });
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-structured-diff ok", children: "Same item names as unified." });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-structured-diff", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-structured-diff", children: [
       missing.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
         "Missing: ",
         missing.join(", ")
@@ -26485,8 +26485,8 @@
       const nextContent = commonItemContentWithField(specificItem, field, unifiedItem[field]);
       if (nextContent) onSpecificContentChange(nextContent);
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-field-diffs", children: COMMON_ITEM_FIELDS.map(({ field, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-sync-structured-field-diff", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-structured-field-diff-title", children: label }),
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-structured-field-diffs", children: COMMON_ITEM_FIELDS.map(({ field, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "provider-config-sync-structured-field-diff", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-structured-field-diff-title", children: label }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         AlignedDiffView,
         {
@@ -26520,7 +26520,7 @@
     ] }, label)) });
   }
   function StructuredParseError() {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-empty", children: "This item needs a valid converted shape before it can be shown here." });
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "This item needs a valid converted shape before it can be shown here." });
   }
 
   // src/mcp-app.tsx
@@ -26584,7 +26584,7 @@
   function isRecord(value) {
     return typeof value === "object" && value !== null;
   }
-  function createMcpProviderSyncClient(host2) {
+  function createMcpProviderConfigSyncClient(host2) {
     return {
       listProjects: () => host2.callTool("list_provider_config_projects").then((body) => body.projects ?? []),
       getState: (cwd) => host2.callTool("get_provider_config_state", { cwd }),
@@ -26599,7 +26599,7 @@
       listCapabilityPickerSources: (cwd) => host2.callTool("list_provider_config_capability_picker", { cwd })
     };
   }
-  function McpProviderSyncApp({ host: host2 }) {
+  function McpProviderConfigSyncApp({ host: host2 }) {
     (0, import_react2.useEffect)(() => {
       const observer = new MutationObserver(() => host2.resize());
       observer.observe(document.body, { childList: true, subtree: true, attributes: true });
@@ -26608,12 +26608,12 @@
       return () => observer.disconnect();
     }, [host2]);
     return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      ProviderSyncPage,
+      ProviderConfigSyncPage,
       {
         open: true,
         cwd: null,
         onClose: () => void 0,
-        client: createMcpProviderSyncClient(host2)
+        client: createMcpProviderConfigSyncClient(host2)
       }
     );
   }
@@ -26622,7 +26622,7 @@
     throw new Error("MCP app root element is missing");
   }
   var host = new McpHostBridge();
-  (0, import_client.createRoot)(rootElement).render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(McpProviderSyncApp, { host }));
+  (0, import_client.createRoot)(rootElement).render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(McpProviderConfigSyncApp, { host }));
 })();
 /*! Bundled license information:
 

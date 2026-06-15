@@ -74,7 +74,7 @@ def create_server() -> FastMCP:
     @server.tool()
     async def list_provider_config_projects() -> dict[str, Any]:
         try:
-            return await api.list_provider_sync_projects()
+            return await api.list_provider_config_sync_projects()
         except HTTPException as error:
             raise _error(error) from error
 

@@ -1783,7 +1783,7 @@ def _read_auto_sync_settings() -> dict:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        raise HTTPException(status_code=409, detail=f"provider sync settings are unreadable: {e}")
+        raise HTTPException(status_code=409, detail=f"provider config sync settings are unreadable: {e}")
     return _clean_auto_sync_settings(raw.get("auto_sync") if isinstance(raw, dict) else {})
 
 
@@ -1839,7 +1839,7 @@ def _effective_auto_sync_policy(settings: dict, cwd: str = "", capability_id: st
 def get_auto_sync_settings(cwd: str = "", capability_id: str = "") -> dict:
     normalized_cwd = _normalize_settings_cwd(cwd)
     if capability_id and not _valid_capability_id(capability_id):
-        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+        raise HTTPException(status_code=400, detail="invalid provider config sync capability id")
     settings = _read_auto_sync_settings()
     return {
         **settings,
@@ -1852,7 +1852,7 @@ def update_auto_sync_settings(req: AutoSyncSettingsPatch) -> dict:
         raise HTTPException(status_code=400, detail="invalid auto-sync settings level")
     capability_id = req.capability_id
     if capability_id and not _valid_capability_id(capability_id):
-        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+        raise HTTPException(status_code=400, detail="invalid provider config sync capability id")
     cwd = _normalize_settings_cwd(req.cwd)
     settings = _read_auto_sync_settings()
     cleaned = _clean_auto_sync_policy(req.policy, allow_partial=req.level != "global")
@@ -2372,12 +2372,12 @@ async def _broadcast_changed(scope: str, category: str, capability_id: str, path
 
 
 @router.get("")
-async def get_provider_sync(cwd: str = Query("", description="Project cwd for project-scope native files")):
+async def get_provider_config_sync(cwd: str = Query("", description="Project cwd for project-scope native files")):
     return _discover(cwd)
 
 
 @router.get("/projects")
-async def list_provider_sync_projects():
+async def list_provider_config_sync_projects():
     projects = []
     for project in _project_records_source():
         path = project.get("path")

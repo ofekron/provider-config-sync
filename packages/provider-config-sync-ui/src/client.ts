@@ -1,64 +1,64 @@
 import type {
-  ProviderSyncApplyRequest,
-  ProviderSyncAutoPolicy,
-  ProviderSyncAutoOperation,
-  ProviderSyncAutoOverrideMode,
-  ProviderSyncAutoRequest,
-  ProviderSyncAutoResponse,
-  ProviderSyncAutoSettings,
-  ProviderSyncAutoSettingsLevel,
-  ProviderSyncCapabilityPickerResponse,
-  ProviderSyncCapability,
-  ProviderSyncCreateCapabilityRequest,
-  ProviderSyncDeleteCapabilityRequest,
-  ProviderSyncResponse,
-  ProviderSyncRestoreRequest,
-  ProviderSyncTransferCapabilityRequest,
-  ProviderSyncWriteRequest,
+  ProviderConfigSyncApplyRequest,
+  ProviderConfigSyncAutoPolicy,
+  ProviderConfigSyncAutoOperation,
+  ProviderConfigSyncAutoOverrideMode,
+  ProviderConfigSyncAutoRequest,
+  ProviderConfigSyncAutoResponse,
+  ProviderConfigSyncAutoSettings,
+  ProviderConfigSyncAutoSettingsLevel,
+  ProviderConfigSyncCapabilityPickerResponse,
+  ProviderConfigSyncCapability,
+  ProviderConfigSyncCreateCapabilityRequest,
+  ProviderConfigSyncDeleteCapabilityRequest,
+  ProviderConfigSyncResponse,
+  ProviderConfigSyncRestoreRequest,
+  ProviderConfigSyncTransferCapabilityRequest,
+  ProviderConfigSyncWriteRequest,
 } from "@better-agent/provider-config-sync-core";
 
 // Minimal project shape the picker needs. Hosts with richer project objects
 // can pass them in; only these fields are read.
-export interface ProviderSyncProject {
+export interface ProviderConfigSyncProject {
   path: string;
   node_id?: string;
   name: string;
 }
 
-export interface ProviderSyncUpdateSettingsRequest {
-  level: ProviderSyncAutoSettingsLevel;
+export interface ProviderConfigSyncUpdateSettingsRequest {
+  level: ProviderConfigSyncAutoSettingsLevel;
   cwd: string;
   capability_id: string;
-  policy: ProviderSyncAutoPolicy | Record<ProviderSyncAutoOperation, ProviderSyncAutoOverrideMode>;
+  policy: ProviderConfigSyncAutoPolicy | Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoOverrideMode>;
 }
 
-export interface ProviderSyncCreateCapabilityResponse {
-  capability?: ProviderSyncCapability;
+export interface ProviderConfigSyncCreateCapabilityResponse {
+  capability?: ProviderConfigSyncCapability;
 }
 
 // One method per provider-config-sync HTTP endpoint. The host injects an
 // implementation; the UI never calls fetch directly.
-export interface ProviderSyncApiClient {
-  listProjects(): Promise<ProviderSyncProject[]>;
-  getState(cwd: string): Promise<ProviderSyncResponse>;
-  updateAutoSettings(body: ProviderSyncUpdateSettingsRequest): Promise<ProviderSyncAutoSettings>;
-  writeFile(body: ProviderSyncWriteRequest): Promise<void>;
-  restoreFile(body: ProviderSyncRestoreRequest): Promise<void>;
-  deleteCapability(body: ProviderSyncDeleteCapabilityRequest): Promise<void>;
-  createCapability(body: ProviderSyncCreateCapabilityRequest): Promise<ProviderSyncCreateCapabilityResponse>;
-  transferCapability(body: ProviderSyncTransferCapabilityRequest): Promise<ProviderSyncCreateCapabilityResponse>;
-  apply(body: ProviderSyncApplyRequest): Promise<void>;
-  autoSync(body: ProviderSyncAutoRequest): Promise<ProviderSyncAutoResponse>;
-  listCapabilityPickerSources(cwd: string): Promise<ProviderSyncCapabilityPickerResponse>;
+export interface ProviderConfigSyncApiClient {
+  listProjects(): Promise<ProviderConfigSyncProject[]>;
+  getState(cwd: string): Promise<ProviderConfigSyncResponse>;
+  updateAutoSettings(body: ProviderConfigSyncUpdateSettingsRequest): Promise<ProviderConfigSyncAutoSettings>;
+  writeFile(body: ProviderConfigSyncWriteRequest): Promise<void>;
+  restoreFile(body: ProviderConfigSyncRestoreRequest): Promise<void>;
+  deleteCapability(body: ProviderConfigSyncDeleteCapabilityRequest): Promise<void>;
+  createCapability(body: ProviderConfigSyncCreateCapabilityRequest): Promise<ProviderConfigSyncCreateCapabilityResponse>;
+  transferCapability(body: ProviderConfigSyncTransferCapabilityRequest): Promise<ProviderConfigSyncCreateCapabilityResponse>;
+  apply(body: ProviderConfigSyncApplyRequest): Promise<void>;
+  autoSync(body: ProviderConfigSyncAutoRequest): Promise<ProviderConfigSyncAutoResponse>;
+  listCapabilityPickerSources(cwd: string): Promise<ProviderConfigSyncCapabilityPickerResponse>;
 }
 
-export interface FetchProviderSyncClientOptions {
+export interface FetchProviderConfigSyncClientOptions {
   baseUrl: string;
   credentials?: RequestCredentials;
-  routes?: ProviderSyncFetchRoutes;
+  routes?: ProviderConfigSyncFetchRoutes;
 }
 
-export interface ProviderSyncFetchRoutes {
+export interface ProviderConfigSyncFetchRoutes {
   projects: string;
   state: string;
   settings: string;
@@ -71,7 +71,7 @@ export interface ProviderSyncFetchRoutes {
   capabilityPicker: string;
 }
 
-export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderSyncFetchRoutes = {
+export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
   projects: "/api/provider-config-sync/projects",
   state: "/api/provider-config-sync",
   settings: "/api/provider-config-sync/settings",
@@ -84,17 +84,17 @@ export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderSyncFetchRoutes = {
   capabilityPicker: "/api/provider-config-sync/capability-picker",
 };
 
-export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES: ProviderSyncFetchRoutes = {
+export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
   projects: "/api/projects",
-  state: "/api/provider-sync",
-  settings: "/api/provider-sync/settings",
-  file: "/api/provider-sync/file",
-  restoreFile: "/api/provider-sync/file/restore",
-  capability: "/api/provider-sync/capability",
-  transferCapability: "/api/provider-sync/capability/transfer",
-  apply: "/api/provider-sync/apply",
-  autoSync: "/api/provider-sync/auto-sync",
-  capabilityPicker: "/api/provider-sync/capability-picker",
+  state: "/api/provider-config-sync",
+  settings: "/api/provider-config-sync/settings",
+  file: "/api/provider-config-sync/file",
+  restoreFile: "/api/provider-config-sync/file/restore",
+  capability: "/api/provider-config-sync/capability",
+  transferCapability: "/api/provider-config-sync/capability/transfer",
+  apply: "/api/provider-config-sync/apply",
+  autoSync: "/api/provider-config-sync/auto-sync",
+  capabilityPicker: "/api/provider-config-sync/capability-picker",
 };
 
 function pathWithParams(path: string, params: URLSearchParams): string {
@@ -104,9 +104,9 @@ function pathWithParams(path: string, params: URLSearchParams): string {
 
 // Generic fetch client for the standalone provider-config-sync backend. Hosts
 // with different route ownership inject a route map or their own client.
-export function createFetchProviderSyncClient(
-  options: FetchProviderSyncClientOptions,
-): ProviderSyncApiClient {
+export function createFetchProviderConfigSyncClient(
+  options: FetchProviderConfigSyncClientOptions,
+): ProviderConfigSyncApiClient {
   const { baseUrl, credentials = "include", routes = PROVIDER_CONFIG_SYNC_ROUTES } = options;
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -127,14 +127,14 @@ export function createFetchProviderSyncClient(
 
   return {
     listProjects: () =>
-      request<{ projects?: ProviderSyncProject[] }>(routes.projects).then((b) => b.projects ?? []),
+      request<{ projects?: ProviderConfigSyncProject[] }>(routes.projects).then((b) => b.projects ?? []),
     getState: (cwd) => {
       const params = new URLSearchParams();
       if (cwd) params.set("cwd", cwd);
-      return request<ProviderSyncResponse>(pathWithParams(routes.state, params));
+      return request<ProviderConfigSyncResponse>(pathWithParams(routes.state, params));
     },
     updateAutoSettings: (body) =>
-      request<ProviderSyncAutoSettings>(routes.settings, {
+      request<ProviderConfigSyncAutoSettings>(routes.settings, {
         method: "PATCH",
         body: json(body),
       }),
@@ -145,35 +145,35 @@ export function createFetchProviderSyncClient(
     deleteCapability: (body) =>
       request<void>(routes.capability, { method: "DELETE", body: json(body) }),
     createCapability: (body) =>
-      request<ProviderSyncCreateCapabilityResponse>(routes.capability, {
+      request<ProviderConfigSyncCreateCapabilityResponse>(routes.capability, {
         method: "POST",
         body: json(body),
       }),
     transferCapability: (body) =>
-      request<ProviderSyncCreateCapabilityResponse>(routes.transferCapability, {
+      request<ProviderConfigSyncCreateCapabilityResponse>(routes.transferCapability, {
         method: "POST",
         body: json(body),
       }),
     apply: (body) =>
       request<void>(routes.apply, { method: "POST", body: json(body) }),
     autoSync: (body) =>
-      request<ProviderSyncAutoResponse>(routes.autoSync, {
+      request<ProviderConfigSyncAutoResponse>(routes.autoSync, {
         method: "POST",
         body: json(body),
       }),
     listCapabilityPickerSources: (cwd) => {
       const params = new URLSearchParams();
       if (cwd) params.set("cwd", cwd);
-      return request<ProviderSyncCapabilityPickerResponse>(pathWithParams(routes.capabilityPicker, params));
+      return request<ProviderConfigSyncCapabilityPickerResponse>(pathWithParams(routes.capabilityPicker, params));
     },
   };
 }
 
-export function createBetterClaudeProviderSyncClient(
-  options: Omit<FetchProviderSyncClientOptions, "routes">,
-): ProviderSyncApiClient {
-  return createFetchProviderSyncClient({
+export function createBetterClaudeProviderConfigSyncClient(
+  options: Omit<FetchProviderConfigSyncClientOptions, "routes">,
+): ProviderConfigSyncApiClient {
+  return createFetchProviderConfigSyncClient({
     ...options,
-    routes: BETTER_CLAUDE_PROVIDER_SYNC_ROUTES,
+    routes: BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES,
   });
 }

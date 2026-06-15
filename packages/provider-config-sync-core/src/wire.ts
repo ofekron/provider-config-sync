@@ -2,20 +2,20 @@
 // Single source of truth for the request/response shapes shared by the
 // backend, the UI package, and any host consumer.
 
-export type ProviderSyncScope = "global" | "project";
-export type ProviderSyncCategory = "instructions" | "memory" | "config" | "skill" | "agent" | "command";
-export type ProviderSyncRole = "unified" | "specific";
+export type ProviderConfigSyncScope = "global" | "project";
+export type ProviderConfigSyncCategory = "instructions" | "memory" | "config" | "skill" | "agent" | "command";
+export type ProviderConfigSyncRole = "unified" | "specific";
 
-export interface ProviderSyncFile {
+export interface ProviderConfigSyncFile {
   entry_id: string;
   path: string;
   content_kind: string;
-  scope: ProviderSyncScope;
-  category: ProviderSyncCategory;
+  scope: ProviderConfigSyncScope;
+  category: ProviderConfigSyncCategory;
   capability_id: string;
   capability_key: string;
   capability_name: string;
-  role: ProviderSyncRole;
+  role: ProviderConfigSyncRole;
   label: string;
   language: string;
   content: string;
@@ -29,47 +29,47 @@ export interface ProviderSyncFile {
   provider_kinds: string[];
 }
 
-export interface ProviderSyncProviderTokenCount {
+export interface ProviderConfigSyncProviderTokenCount {
   provider_kind: string;
   provider_name: string;
   token_count: number;
 }
 
-export interface ProviderSyncTokenTotals {
+export interface ProviderConfigSyncTokenTotals {
   unified: number;
   specifics: number;
   all_tracked: number;
-  by_provider: ProviderSyncProviderTokenCount[];
+  by_provider: ProviderConfigSyncProviderTokenCount[];
 }
 
-export interface ProviderSyncCapability {
+export interface ProviderConfigSyncCapability {
   id: string;
   capability_id: string;
   name: string;
-  scope: ProviderSyncScope;
-  category: ProviderSyncCategory;
+  scope: ProviderConfigSyncScope;
+  category: ProviderConfigSyncCategory;
   language: string;
-  unified: ProviderSyncFile;
-  specifics: ProviderSyncFile[];
+  unified: ProviderConfigSyncFile;
+  specifics: ProviderConfigSyncFile[];
   unified_token_count: number;
   specific_token_count: number;
   total_token_count: number;
-  provider_token_counts: ProviderSyncProviderTokenCount[];
+  provider_token_counts: ProviderConfigSyncProviderTokenCount[];
   has_diffs: boolean;
   specific_count: number;
   missing_count: number;
 }
 
-export interface ProviderSyncResponse {
-  files: ProviderSyncFile[];
-  capabilities: ProviderSyncCapability[];
+export interface ProviderConfigSyncResponse {
+  files: ProviderConfigSyncFile[];
+  capabilities: ProviderConfigSyncCapability[];
   providers: { kind: string; name: string }[];
-  token_totals: ProviderSyncTokenTotals;
-  groups: Record<ProviderSyncScope, ProviderSyncCapability[]>;
-  auto_settings?: ProviderSyncAutoSettings;
+  token_totals: ProviderConfigSyncTokenTotals;
+  groups: Record<ProviderConfigSyncScope, ProviderConfigSyncCapability[]>;
+  auto_settings?: ProviderConfigSyncAutoSettings;
 }
 
-export interface ProviderSyncWriteRequest {
+export interface ProviderConfigSyncWriteRequest {
   cwd: string;
   entry_id: string;
   path?: string;
@@ -77,23 +77,23 @@ export interface ProviderSyncWriteRequest {
   content: string;
 }
 
-export interface ProviderSyncRestoreRequest {
+export interface ProviderConfigSyncRestoreRequest {
   cwd: string;
   entry_id: string;
   path?: string;
   expected_content: string | null;
 }
 
-export interface ProviderSyncDeleteCapabilityRequest {
+export interface ProviderConfigSyncDeleteCapabilityRequest {
   cwd: string;
-  scope: ProviderSyncScope;
+  scope: ProviderConfigSyncScope;
   capability_id: string;
   expected_contents: Record<string, string | null>;
 }
 
-export interface ProviderSyncCreateCapabilityRequest {
+export interface ProviderConfigSyncCreateCapabilityRequest {
   cwd: string;
-  scope: ProviderSyncScope;
+  scope: ProviderConfigSyncScope;
   category: "skill" | "agent" | "command";
   provider_kinds: string[];
   name: string;
@@ -102,17 +102,17 @@ export interface ProviderSyncCreateCapabilityRequest {
   metadata: Record<string, unknown>;
 }
 
-export interface ProviderSyncTransferCapabilityRequest {
+export interface ProviderConfigSyncTransferCapabilityRequest {
   cwd: string;
-  scope: ProviderSyncScope;
+  scope: ProviderConfigSyncScope;
   capability_id: string;
   target_cwd: string;
-  target_scope: ProviderSyncScope;
+  target_scope: ProviderConfigSyncScope;
   mode: "copy" | "move";
   expected_contents: Record<string, string | null>;
 }
 
-export interface ProviderSyncApplyRequest {
+export interface ProviderConfigSyncApplyRequest {
   cwd: string;
   capability_id: string;
   source_entry_id: string;
@@ -123,53 +123,53 @@ export interface ProviderSyncApplyRequest {
   expected_target: string | null;
 }
 
-export type ProviderSyncAutoMode = "off" | "auto" | "review" | "llm";
-export type ProviderSyncAutoOperation = "additive" | "removal" | "change";
+export type ProviderConfigSyncAutoMode = "off" | "auto" | "review" | "llm";
+export type ProviderConfigSyncAutoOperation = "additive" | "removal" | "change";
 
-export interface ProviderSyncAutoPolicy {
-  additive: ProviderSyncAutoMode;
-  removal: ProviderSyncAutoMode;
-  change: ProviderSyncAutoMode;
+export interface ProviderConfigSyncAutoPolicy {
+  additive: ProviderConfigSyncAutoMode;
+  removal: ProviderConfigSyncAutoMode;
+  change: ProviderConfigSyncAutoMode;
 }
 
-export type ProviderSyncAutoOverrideMode = ProviderSyncAutoMode | "inherit";
-export type ProviderSyncAutoSettingsLevel = "global" | "capability" | "project" | "project_capability";
-export type ProviderSyncAutoOverridePolicy = Partial<Record<ProviderSyncAutoOperation, ProviderSyncAutoMode>>;
+export type ProviderConfigSyncAutoOverrideMode = ProviderConfigSyncAutoMode | "inherit";
+export type ProviderConfigSyncAutoSettingsLevel = "global" | "capability" | "project" | "project_capability";
+export type ProviderConfigSyncAutoOverridePolicy = Partial<Record<ProviderConfigSyncAutoOperation, ProviderConfigSyncAutoMode>>;
 
-export interface ProviderSyncAutoProjectSettings {
-  policy?: ProviderSyncAutoOverridePolicy;
-  capabilities?: Record<string, ProviderSyncAutoOverridePolicy>;
+export interface ProviderConfigSyncAutoProjectSettings {
+  policy?: ProviderConfigSyncAutoOverridePolicy;
+  capabilities?: Record<string, ProviderConfigSyncAutoOverridePolicy>;
 }
 
-export interface ProviderSyncAutoSettings {
-  global: ProviderSyncAutoPolicy;
-  capabilities: Record<string, ProviderSyncAutoOverridePolicy>;
-  projects: Record<string, ProviderSyncAutoProjectSettings>;
-  effective: ProviderSyncAutoPolicy;
+export interface ProviderConfigSyncAutoSettings {
+  global: ProviderConfigSyncAutoPolicy;
+  capabilities: Record<string, ProviderConfigSyncAutoOverridePolicy>;
+  projects: Record<string, ProviderConfigSyncAutoProjectSettings>;
+  effective: ProviderConfigSyncAutoPolicy;
 }
 
-export interface ProviderSyncAutoRequest {
+export interface ProviderConfigSyncAutoRequest {
   cwd: string;
   capability_id: string;
   source_entry_id: string;
   target_entry_id: string;
   expected_source: string;
   expected_target: string | null;
-  policy: ProviderSyncAutoPolicy;
+  policy: ProviderConfigSyncAutoPolicy;
   approved_hunk_ids?: string[];
   llm_hunk_ids?: string[];
 }
 
-export interface ProviderSyncAutoLogItem {
+export interface ProviderConfigSyncAutoLogItem {
   hunk_id: string;
-  operation: ProviderSyncAutoOperation;
-  mode: ProviderSyncAutoMode;
+  operation: ProviderConfigSyncAutoOperation;
+  mode: ProviderConfigSyncAutoMode;
   status: "applied" | "pending" | "skipped";
   row_count: number;
   preview: string;
 }
 
-export interface ProviderSyncAutoResponse {
+export interface ProviderConfigSyncAutoResponse {
   ok: boolean;
   source_entry_id: string;
   target_entry_id: string;
@@ -179,20 +179,20 @@ export interface ProviderSyncAutoResponse {
   applied_count: number;
   pending_count: number;
   skipped_count: number;
-  log_head: ProviderSyncAutoLogItem[];
+  log_head: ProviderConfigSyncAutoLogItem[];
 }
 
-export interface ProviderSyncCapabilityPickerSource {
+export interface ProviderConfigSyncCapabilityPickerSource {
   source_id: string;
-  source_scope: ProviderSyncScope;
+  source_scope: ProviderConfigSyncScope;
   source_cwd: string;
   source_label: string;
-  capability: ProviderSyncCapability;
-  preferred_entry: ProviderSyncFile | null;
-  outputs: ProviderSyncCapabilityPickerOutput[];
+  capability: ProviderConfigSyncCapability;
+  preferred_entry: ProviderConfigSyncFile | null;
+  outputs: ProviderConfigSyncCapabilityPickerOutput[];
 }
 
-export interface ProviderSyncCapabilityPickerOutput {
+export interface ProviderConfigSyncCapabilityPickerOutput {
   provider_kind: string;
   provider_name: string;
   entry_id: string;
@@ -205,6 +205,6 @@ export interface ProviderSyncCapabilityPickerOutput {
   render_error: string | null;
 }
 
-export interface ProviderSyncCapabilityPickerResponse {
-  sources: ProviderSyncCapabilityPickerSource[];
+export interface ProviderConfigSyncCapabilityPickerResponse {
+  sources: ProviderConfigSyncCapabilityPickerSource[];
 }
