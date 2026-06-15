@@ -25991,12 +25991,16 @@
     );
   }
   function EditableDiffCell({
+    editorKey,
     label,
     lineNumber,
     fallbackIndex,
     text,
     cellClassName,
     writable,
+    active,
+    onActivate,
+    onDeactivate,
     onChange
   }) {
     const editorRef = (0, import_react.useRef)(null);
@@ -26013,6 +26017,30 @@
       }
       resizeEditor(editor);
     }, [resizeEditor, text]);
+    (0, import_react.useEffect)(() => {
+      if (!active) return;
+      const editor = editorRef.current;
+      editor?.focus();
+      editor?.setSelectionRange(editor.value.length, editor.value.length);
+    }, [active]);
+    if (!active) {
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: cellClassName, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "pre",
+        {
+          className: "provider-sync-aligned-diff-cell-text",
+          tabIndex: writable ? 0 : void 0,
+          onDoubleClick: () => {
+            if (writable) onActivate(editorKey);
+          },
+          onKeyDown: (e) => {
+            if (!writable || e.key !== "Enter" && e.key !== "F2") return;
+            e.preventDefault();
+            onActivate(editorKey);
+          },
+          children: text
+        }
+      ) });
+    }
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: cellClassName, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "textarea",
       {
@@ -26023,6 +26051,7 @@
         readOnly: !writable,
         rows,
         spellCheck: false,
+        onBlur: () => onDeactivate(editorKey),
         onChange: (e) => {
           resizeEditor(e.target);
           onChange(lineNumber, fallbackIndex, e.target.value);
@@ -26187,10 +26216,12 @@
     const diffRowNodes = (0, import_react.useRef)(/* @__PURE__ */ new Map());
     const nextDiffIndex = (0, import_react.useRef)(0);
     const [highlightedDiffKey, setHighlightedDiffKey] = (0, import_react.useState)(null);
+    const [activeEditorKey, setActiveEditorKey] = (0, import_react.useState)(null);
     (0, import_react.useEffect)(() => {
       nextDiffIndex.current = 0;
       diffRowNodes.current.clear();
       setHighlightedDiffKey(null);
+      setActiveEditorKey(null);
     }, [unifiedContent, specificContent]);
     const registerDiffRow = (0, import_react.useCallback)((key, node) => {
       if (node) {
@@ -26208,6 +26239,9 @@
       setHighlightedDiffKey(key);
       window.setTimeout(() => setHighlightedDiffKey((current) => current === key ? null : current), 900);
     }, [diffRowKeys]);
+    const deactivateEditor = (0, import_react.useCallback)((key) => {
+      setActiveEditorKey((current) => current === key ? null : current);
+    }, []);
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `${className ? `${className} ` : ""}provider-sync-aligned-diff`, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-aligned-diff-header", children: [
         editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -26281,12 +26315,16 @@
                 editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableDiffCell,
                   {
+                    editorKey: `${renderKey}:left`,
                     label: leftLabel,
                     lineNumber: row.unifiedLine,
                     fallbackIndex: index,
                     text: row.unifiedText,
                     cellClassName: diffCellClassName(row, "left"),
                     writable: editable.leftWritable,
+                    active: activeEditorKey === `${renderKey}:left`,
+                    onActivate: setActiveEditorKey,
+                    onDeactivate: deactivateEditor,
                     onChange: editable.onChangeLeft
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: diffCellClassName(row, "left"), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: row.unifiedText }) }),
@@ -26312,12 +26350,16 @@
                 editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableDiffCell,
                   {
+                    editorKey: `${renderKey}:right`,
                     label: rightLabel,
                     lineNumber: row.specificLine,
                     fallbackIndex: index,
                     text: row.specificText,
                     cellClassName: diffCellClassName(row, "right"),
                     writable: editable.rightWritable,
+                    active: activeEditorKey === `${renderKey}:right`,
+                    onActivate: setActiveEditorKey,
+                    onDeactivate: deactivateEditor,
                     onChange: editable.onChangeRight
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: diffCellClassName(row, "right"), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: row.specificText }) })

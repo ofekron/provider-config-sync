@@ -283,6 +283,18 @@ def t_diff_text_edits_preserve_focus() -> None:
     check("editableDiffRowKey" in page, "editable diff rows use stable render keys")
 
 
+def t_editable_diff_text_is_selectable_across_rows() -> None:
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    styles = _UI_STYLES.read_text(encoding="utf-8")
+    cell = page.split("function EditableDiffCell(", 1)[1].split("function diffCellTone(", 1)[0]
+    text_rule = styles.rsplit(".provider-sync-aligned-diff-cell-text {", 1)[1].split("}", 1)[0]
+    check("if (!active)" in cell, "editable diff cells render selectable text when not actively editing")
+    check('className="provider-sync-aligned-diff-cell-text"' in cell, "editable diff cells expose selectable text nodes")
+    check("<textarea" in cell and "activeEditorKey" in page, "editable diff cells only use textarea for the active editor")
+    check("onDoubleClick" in cell, "editable diff selectable text can still enter edit mode")
+    check("user-select: text;" in text_rule, "editable diff selectable text allows browser range selection")
+
+
 def t_structured_skill_fields_use_editable_side_by_side_diffs() -> None:
     page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
     structured_view = page.split("function StructuredSpecificView(", 1)[1].split("function ProviderSyncPageSettings(", 1)[0]
@@ -945,6 +957,7 @@ def main() -> int:
     t_diff_views_use_natural_height_without_internal_scrolling()
     t_file_actions_live_in_diff_header()
     t_diff_text_edits_preserve_focus()
+    t_editable_diff_text_is_selectable_across_rows()
     t_structured_skill_fields_use_editable_side_by_side_diffs()
     t_mcp_server_exposes_sync_tools()
     t_agent_integrations_install_native_commands()

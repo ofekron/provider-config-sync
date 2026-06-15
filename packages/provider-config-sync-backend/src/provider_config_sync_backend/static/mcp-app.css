@@ -766,12 +766,22 @@
       transparent 6px,
       transparent 12px);
 }
-.provider-sync-aligned-diff-row pre {
+.provider-sync-aligned-diff-row pre,
+.provider-sync-aligned-diff-cell-text {
   min-width: 0;
   margin: 0;
   padding: 2px 8px 4px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+.provider-sync-aligned-diff-cell-text {
+  user-select: text;
+  cursor: text;
+}
+.provider-sync-aligned-diff-cell-text:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  background: var(--input-bg);
 }
 .provider-sync-aligned-diff-cell-editor {
   min-width: 0;
@@ -1422,6 +1432,7 @@
   }
   .provider-sync-diff-cell,
   .provider-sync-aligned-diff-row pre,
+  .provider-sync-aligned-diff-cell-text,
   .provider-sync-aligned-diff-cell-editor {
     border-right: 0 !important;
     padding: 4px 6px;

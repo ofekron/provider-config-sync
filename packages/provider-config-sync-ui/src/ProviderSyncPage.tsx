@@ -1508,20 +1508,28 @@ interface EditableDiffControls {
 }
 
 function EditableDiffCell({
+  editorKey,
   label,
   lineNumber,
   fallbackIndex,
   text,
   cellClassName,
   writable,
+  active,
+  onActivate,
+  onDeactivate,
   onChange,
 }: {
+  editorKey: string;
   label: string;
   lineNumber: number | null;
   fallbackIndex: number;
   text: string;
   cellClassName: string;
   writable: boolean;
+  active: boolean;
+  onActivate: (key: string) => void;
+  onDeactivate: (key: string) => void;
   onChange: (lineNumber: number | null, fallbackIndex: number, content: string) => void;
 }) {
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -1540,6 +1548,34 @@ function EditableDiffCell({
     resizeEditor(editor);
   }, [resizeEditor, text]);
 
+  useEffect(() => {
+    if (!active) return;
+    const editor = editorRef.current;
+    editor?.focus();
+    editor?.setSelectionRange(editor.value.length, editor.value.length);
+  }, [active]);
+
+  if (!active) {
+    return (
+      <div className={cellClassName}>
+        <pre
+          className="provider-sync-aligned-diff-cell-text"
+          tabIndex={writable ? 0 : undefined}
+          onDoubleClick={() => {
+            if (writable) onActivate(editorKey);
+          }}
+          onKeyDown={(e) => {
+            if (!writable || (e.key !== "Enter" && e.key !== "F2")) return;
+            e.preventDefault();
+            onActivate(editorKey);
+          }}
+        >
+          {text}
+        </pre>
+      </div>
+    );
+  }
+
   return (
     <div className={cellClassName}>
       <textarea
@@ -1550,6 +1586,7 @@ function EditableDiffCell({
         readOnly={!writable}
         rows={rows}
         spellCheck={false}
+        onBlur={() => onDeactivate(editorKey)}
         onChange={(e) => {
           resizeEditor(e.target);
           onChange(lineNumber, fallbackIndex, e.target.value);
@@ -1753,11 +1790,13 @@ function AlignedDiffView({
   const diffRowNodes = useRef(new Map<string, HTMLDivElement>());
   const nextDiffIndex = useRef(0);
   const [highlightedDiffKey, setHighlightedDiffKey] = useState<string | null>(null);
+  const [activeEditorKey, setActiveEditorKey] = useState<string | null>(null);
 
   useEffect(() => {
     nextDiffIndex.current = 0;
     diffRowNodes.current.clear();
     setHighlightedDiffKey(null);
+    setActiveEditorKey(null);
   }, [unifiedContent, specificContent]);
 
   const registerDiffRow = useCallback((key: string, node: HTMLDivElement | null) => {
@@ -1777,6 +1816,10 @@ function AlignedDiffView({
     setHighlightedDiffKey(key);
     window.setTimeout(() => setHighlightedDiffKey((current) => (current === key ? null : current)), 900);
   }, [diffRowKeys]);
+
+  const deactivateEditor = useCallback((key: string) => {
+    setActiveEditorKey((current) => (current === key ? null : current));
+  }, []);
 
   return (
     <div className={`${className ? `${className} ` : ""}provider-sync-aligned-diff`}>
@@ -1847,12 +1890,16 @@ function AlignedDiffView({
                 <span className="provider-sync-line-number">{row.unifiedLine ?? ""}</span>
                 {editable ? (
                   <EditableDiffCell
+                    editorKey={`${renderKey}:left`}
                     label={leftLabel}
                     lineNumber={row.unifiedLine}
                     fallbackIndex={index}
                     text={row.unifiedText}
                     cellClassName={diffCellClassName(row, "left")}
                     writable={editable.leftWritable}
+                    active={activeEditorKey === `${renderKey}:left`}
+                    onActivate={setActiveEditorKey}
+                    onDeactivate={deactivateEditor}
                     onChange={editable.onChangeLeft}
                   />
                 ) : (
@@ -1881,12 +1928,16 @@ function AlignedDiffView({
                 <span className="provider-sync-line-number">{row.specificLine ?? ""}</span>
                 {editable ? (
                   <EditableDiffCell
+                    editorKey={`${renderKey}:right`}
                     label={rightLabel}
                     lineNumber={row.specificLine}
                     fallbackIndex={index}
                     text={row.specificText}
                     cellClassName={diffCellClassName(row, "right")}
                     writable={editable.rightWritable}
+                    active={activeEditorKey === `${renderKey}:right`}
+                    onActivate={setActiveEditorKey}
+                    onDeactivate={deactivateEditor}
                     onChange={editable.onChangeRight}
                   />
                 ) : (
