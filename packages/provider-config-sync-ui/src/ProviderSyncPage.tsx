@@ -617,7 +617,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     try {
       let latestLog: ProviderSyncAutoResponse | null = null;
       for (const target of selectedCapability.specifics) {
-        if (!target.writable || !target.exists || target.entry_id === unified.entry_id) continue;
+        if (!target.writable || !target.exists || target.disabled || target.entry_id === unified.entry_id) continue;
         const body: ProviderSyncAutoRequest = {
           cwd: targetCwd,
           capability_id: selectedCapability.capability_id,
@@ -981,6 +981,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 && !isDirty(unified)
                 && !isDirty(selectedSpecific)
                 && unified.exists
+                && !selectedSpecific.disabled
                 && selectedSpecific.writable
                 && selectedSpecific.exists
               }
@@ -990,7 +991,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 && !isDirty(unified)
                 && unified.exists
                 && selectedCapability.specifics.every((specific) => !isDirty(specific))
-                && selectedCapability.specifics.some((specific) => specific.exists && specific.writable)
+                && selectedCapability.specifics.some((specific) => specific.exists && specific.writable && !specific.disabled)
               }
               onSave={saveAutoSettings}
               onFixSelectedProvider={() => void llmFixSelectedProvider()}
@@ -1045,7 +1046,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                             onClick={() => setSelectedSpecificId(specific.entry_id)}
                           >
                             <span>{specific.provider_names.join(", ")}</span>
-                            <small className={status}>{status}</small>
+                            <small className={status}>{status}{specific.disabled ? " · disabled" : ""}</small>
                             <small>{formatTokens(specific.token_count)}</small>
                           </button>
                         );
@@ -1058,6 +1059,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                         <div>
                           <strong>{selectedSpecific.provider_names.join(", ")}</strong>
                           <span>{selectedSpecific.exists ? selectedSpecific.label : `${selectedSpecific.label} (new)`}</span>
+                          {selectedSpecific.disabled && <span>disabled</span>}
                           <span>{formatTokens(selectedSpecific.token_count)} est.</span>
                         </div>
                         <small>{selectedSpecific.path}</small>

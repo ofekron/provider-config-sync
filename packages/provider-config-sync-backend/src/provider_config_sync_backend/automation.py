@@ -86,6 +86,8 @@ def _capability_worklist(projects: list[str], config_path: Path | None) -> list[
             status = _capability_status(capability)
             if status == "aligned":
                 continue
+            if any(entry.get("disabled") for entry in capability["specifics"]):
+                continue
             specifics = []
             for entry in capability["specifics"]:
                 entry_status = "missing" if not entry["exists"] else ("aligned" if entry["content"] == capability["unified"]["content"] else "diff")
@@ -100,6 +102,8 @@ def _capability_worklist(projects: list[str], config_path: Path | None) -> list[
                         "status": entry_status,
                     }
                 )
+            if not specifics:
+                continue
             capabilities.append(
                 {
                     "id": capability["capability_id"],

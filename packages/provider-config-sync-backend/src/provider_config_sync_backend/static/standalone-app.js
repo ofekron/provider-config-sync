@@ -25196,7 +25196,7 @@
       try {
         let latestLog = null;
         for (const target of selectedCapability.specifics) {
-          if (!target.writable || !target.exists || target.entry_id === unified.entry_id) continue;
+          if (!target.writable || !target.exists || target.disabled || target.entry_id === unified.entry_id) continue;
           const body = {
             cwd: targetCwd,
             capability_id: selectedCapability.capability_id,
@@ -25554,8 +25554,8 @@
               specific: selectedSpecific,
               effectivePolicy: autoPolicy,
               log: autoLog,
-              canFixSelectedProvider: !!selectedCapability && !!unified && !!selectedSpecific && !isDirty(unified) && !isDirty(selectedSpecific) && unified.exists && selectedSpecific.writable && selectedSpecific.exists,
-              canFixCapability: !!selectedCapability && !!unified && !isDirty(unified) && unified.exists && selectedCapability.specifics.every((specific) => !isDirty(specific)) && selectedCapability.specifics.some((specific) => specific.exists && specific.writable),
+              canFixSelectedProvider: !!selectedCapability && !!unified && !!selectedSpecific && !isDirty(unified) && !isDirty(selectedSpecific) && unified.exists && !selectedSpecific.disabled && selectedSpecific.writable && selectedSpecific.exists,
+              canFixCapability: !!selectedCapability && !!unified && !isDirty(unified) && unified.exists && selectedCapability.specifics.every((specific) => !isDirty(specific)) && selectedCapability.specifics.some((specific) => specific.exists && specific.writable && !specific.disabled),
               onSave: saveAutoSettings,
               onFixSelectedProvider: () => void llmFixSelectedProvider(),
               onFixCapability: () => void llmFixCapability(),
@@ -25596,7 +25596,10 @@
                     onClick: () => setSelectedSpecificId(specific.entry_id),
                     children: [
                       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: specific.provider_names.join(", ") }),
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { className: status, children: status }),
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { className: status, children: [
+                        status,
+                        specific.disabled ? " \xB7 disabled" : ""
+                      ] }),
                       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatTokens(specific.token_count) })
                     ]
                   },
@@ -25608,6 +25611,7 @@
                   /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: selectedSpecific.provider_names.join(", ") }),
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: selectedSpecific.exists ? selectedSpecific.label : `${selectedSpecific.label} (new)` }),
+                    selectedSpecific.disabled && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "disabled" }),
                     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
                       formatTokens(selectedSpecific.token_count),
                       " est."

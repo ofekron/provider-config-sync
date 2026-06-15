@@ -33,6 +33,7 @@ _DEFAULT_CONFIG_DIR = {
 }
 _BACKUP_SUFFIX = ".bc-sync-backup"
 _BACKUP_MARKER_SUFFIX = ".sha256"
+_DISABLED_SUFFIX = ".disabled"
 _MCP_CAPABILITY_ID = "mcp"
 _MCP_CAPABILITY_NAME = "MCP servers"
 _INSTRUCTIONS_CAPABILITY_ID = "instructions"
@@ -582,7 +583,15 @@ def _agent_suffix(provider_kind: str) -> str:
 
 def _agent_scan_patterns(content_kind: str) -> list[str]:
     suffix = ".toml" if content_kind == _CONTENT_TOML_AGENT else ".md"
-    return [f"*{suffix}", f"*{suffix}.disabled"]
+    return [f"*{suffix}", f"*{suffix}{_DISABLED_SUFFIX}"]
+
+
+def _is_disabled_path(path: Path) -> bool:
+    return path.name.endswith(_DISABLED_SUFFIX)
+
+
+def _enabled_name(path: Path) -> str:
+    return path.name.removesuffix(_DISABLED_SUFFIX)
 
 
 def _safe_agent_filename(name: str) -> str:
@@ -767,7 +776,7 @@ def _markdown_command_payload(path: Path, content: str) -> dict:
         description = data.get("description") or ""
     return _normalized_command_payload(
         path=path,
-        name=path.stem,
+        name=Path(_enabled_name(path)).stem,
         description=description,
         instructions=body,
         metadata=metadata,
@@ -822,7 +831,7 @@ def _toml_command_payload(path: Path, content: str) -> dict:
     metadata = {k: v for k, v in data.items() if k not in {"description", "prompt"}}
     return _normalized_command_payload(
         path=path,
-        name=path.stem,
+        name=Path(_enabled_name(path)).stem,
         description=data.get("description") or "",
         instructions=data.get("prompt"),
         metadata=metadata,
@@ -943,13 +952,13 @@ def _command_names_in_root(root: Path, suffix: str) -> set[str]:
     if not root.is_dir() or root.is_symlink():
         return set()
     return {
-        path.stem
+        Path(_enabled_name(path)).stem
         for path in root.iterdir()
         if path.is_file()
         and not path.is_symlink()
-        and path.suffix == suffix
-        and path.stem not in {"", ".", ".."}
-        and Path(path.stem).name == path.stem
+        and _enabled_name(path).endswith(suffix)
+        and Path(_enabled_name(path)).stem not in {"", ".", ".."}
+        and Path(Path(_enabled_name(path)).stem).name == Path(_enabled_name(path)).stem
     }
 
 
@@ -996,12 +1005,12 @@ def _candidate_command_paths(provider: dict, roots: list[Path], name: str) -> li
             return existing
         return [roots[0] / _codex_command_skill_dir(name) / "SKILL.md"] if roots else []
     suffix = _command_suffix(provider["kind"])
-    existing = [
-        root / f"{name}{suffix}"
-        for root in roots
-        if (root / f"{name}{suffix}").is_file()
-        and not (root / f"{name}{suffix}").is_symlink()
-    ]
+    existing = []
+    for root in roots:
+        for filename in (f"{name}{suffix}", f"{name}{suffix}{_DISABLED_SUFFIX}"):
+            path = root / filename
+            if path.is_file() and not path.is_symlink():
+                existing.append(path)
     if existing:
         return existing
     return [roots[0] / f"{_safe_agent_filename(name)}{suffix}"] if roots else []
@@ -1452,6 +1461,7 @@ def _entry_from_candidate(candidate: Candidate) -> dict:
         "read_error": error,
         "writable": error is None and (exists or candidate.can_create),
         "backup_exists": _backup_exists(path),
+        "disabled": _is_disabled_path(path),
         "provider_names": [candidate.provider_name],
         "provider_kinds": [candidate.provider_kind],
     }
@@ -1632,6 +1642,7 @@ def _unified_entry(
         "read_error": error,
         "writable": error is None,
         "backup_exists": _backup_exists(path),
+        "disabled": False,
         "provider_names": ["Unified"],
         "provider_kinds": ["unified"],
     }

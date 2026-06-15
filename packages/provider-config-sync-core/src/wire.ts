@@ -24,6 +24,7 @@ export interface ProviderSyncFile {
   read_error: string | null;
   writable: boolean;
   backup_exists: boolean;
+  disabled: boolean;
   provider_names: string[];
   provider_kinds: string[];
 }

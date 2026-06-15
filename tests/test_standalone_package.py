@@ -377,6 +377,31 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
     try:
         project = (wipe / "project").resolve()
         project.mkdir()
+        agent = wipe / "claude" / "agents" / "reviewer.md.disabled"
+        agent.parent.mkdir(parents=True)
+        agent.write_text(
+            "---\n"
+            "name: reviewer\n"
+            "description: Reviews code\n"
+            "---\n"
+            "Read the diff and report risks.\n",
+            encoding="utf-8",
+        )
+        unified_agent = wipe / "sync-home" / "provider-config-sync" / "global" / "agent" / "agent-reviewer.json"
+        unified_agent.parent.mkdir(parents=True)
+        unified_agent.write_text(
+            json.dumps(
+                {
+                    "name": "reviewer",
+                    "description": "Reviews code",
+                    "instructions": "Use enabled review instructions.\n",
+                    "metadata": {},
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         config_path = wipe / "provider-config-sync.json"
         config_path.write_text(
             json.dumps(
@@ -395,13 +420,22 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
         )
         projects = _projects(config_path)
         worklist = _capability_worklist(projects, config_path)
+        discovered = api._discover("")
+        discovered_reviewer = next(capability for capability in discovered["groups"]["global"] if capability["capability_id"] == "agent-reviewer")
+        check(discovered_reviewer["specifics"][0]["disabled"], "disabled capability remains visible in discovery")
         prompt = _automation_prompt(projects, "Prefer shortest shared config.")
         check("list_provider_config_worklist" in prompt, "automation prompt uses the worklist tool")
         check("Do not enumerate projects or capabilities yourself" in prompt, "automation prompt forbids agent-side enumeration")
         check(str(project) not in prompt and '"cwd": ""' not in prompt, "automation prompt does not embed the worklist")
         check(any(item["capabilities"] for item in worklist), "worklist tool code enumerates actionable capabilities")
+        worklist_capability_ids = {
+            capability["id"]
+            for item in worklist
+            for capability in item["capabilities"]
+        }
+        check("agent-reviewer" not in worklist_capability_ids, "automation excludes disabled capabilities from agent work")
         for provider in ("claude", "codex", "gemini"):
-            temp = wipe / provider
+            temp = wipe / f"temp-{provider}"
             temp.mkdir()
             command, env = _build_command(provider, prompt, project, config_path, temp)
             joined = " ".join(command)
@@ -578,7 +612,7 @@ def t_unified_only_skill_is_discovered() -> None:
         shutil.rmtree(wipe)
 
 
-def t_global_disabled_agent_is_discovered() -> None:
+def t_disabled_capabilities_are_discovered() -> None:
     wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-disabled-agent-"))
     try:
         agent = wipe / "claude" / "agents" / "reviewer.md.disabled"
@@ -591,6 +625,9 @@ def t_global_disabled_agent_is_discovered() -> None:
             "Read the diff and report risks.\n",
             encoding="utf-8",
         )
+        command = wipe / "claude" / "commands" / "review.md.disabled"
+        command.parent.mkdir(parents=True)
+        command.write_text("Review the current diff.\n", encoding="utf-8")
         api.configure(
             provider_records=lambda: [{"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude")}],
             project_records=lambda: [],
@@ -603,6 +640,12 @@ def t_global_disabled_agent_is_discovered() -> None:
         by_kind = {entry["provider_kinds"][0]: entry for entry in capability["specifics"]}
         check("claude" in by_kind, "disabled global Claude agent appears as a capability")
         check(by_kind["claude"]["path"].endswith("reviewer.md.disabled"), "disabled global Claude agent keeps native path")
+        check(by_kind["claude"]["disabled"], "disabled global Claude agent is marked disabled")
+        command_capability = next(capability for capability in payload["groups"]["global"] if capability["capability_id"] == "command-review")
+        command_by_kind = {entry["provider_kinds"][0]: entry for entry in command_capability["specifics"]}
+        check("claude" in command_by_kind, "disabled global Claude command appears as a capability")
+        check(command_by_kind["claude"]["path"].endswith("review.md.disabled"), "disabled global Claude command keeps native path")
+        check(command_by_kind["claude"]["disabled"], "disabled global Claude command is marked disabled")
     finally:
         shutil.rmtree(wipe)
 
@@ -964,7 +1007,7 @@ def main() -> int:
     t_automation_builds_noninteractive_agent_commands()
     t_standalone_commands_convert_provider_formats()
     t_unified_only_skill_is_discovered()
-    t_global_disabled_agent_is_discovered()
+    t_disabled_capabilities_are_discovered()
     t_create_capability_adds_provider_native_seed()
     t_transfer_capability_copies_and_moves_between_levels_and_projects()
     t_auto_sync_applies_auto_and_reviews_per_hunk()
