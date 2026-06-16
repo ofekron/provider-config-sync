@@ -25088,6 +25088,11 @@
       newCapabilityInstructions,
       fetchSync
     ]);
+    const openCreateCapability = (0, import_react.useCallback)((category = "skill") => {
+      setNewCapabilityCategory(category);
+      setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
+      setCreateOpen(true);
+    }, [providerOptions]);
     const transferCapability = (0, import_react.useCallback)(async (capability) => {
       if (!canTransferCapability(capability) || !transferTargetScope) return;
       if (transferTargetScope === "project" && !transferTargetCwd) return;
@@ -25327,8 +25332,11 @@
                   title: "Add capability",
                   disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
                   onClick: () => {
-                    setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
-                    setCreateOpen((current) => !current);
+                    if (createOpen) {
+                      setCreateOpen(false);
+                      return;
+                    }
+                    openCreateCapability();
                   },
                   children: "+"
                 }
@@ -25421,23 +25429,37 @@
                 {
                   className: `provider-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                      "button",
-                      {
-                        type: "button",
-                        className: "provider-sync-capability-group-title",
-                        "aria-expanded": !collapsedGroups[group.category],
-                        onClick: () => setCollapsedGroups((current) => ({
-                          ...current,
-                          [group.category]: !current[group.category]
-                        })),
-                        children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
-                        ]
-                      }
-                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-capability-group-header", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "provider-sync-capability-group-title",
+                          "aria-expanded": !collapsedGroups[group.category],
+                          onClick: () => setCollapsedGroups((current) => ({
+                            ...current,
+                            [group.category]: !current[group.category]
+                          })),
+                          children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
+                          ]
+                        }
+                      ),
+                      CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "btn-secondary provider-sync-icon-action provider-sync-capability-group-add",
+                          "aria-label": `Add ${group.label} capability`,
+                          title: `Add ${group.label} capability`,
+                          disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
+                          onClick: () => openCreateCapability(group.category),
+                          children: "+"
+                        }
+                      )
+                    ] }),
                     !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-sync-capability-item", children: [
                       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                         "button",

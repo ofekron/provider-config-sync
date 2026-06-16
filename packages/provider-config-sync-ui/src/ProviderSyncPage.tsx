@@ -68,6 +68,7 @@ const CREATE_CAPABILITY_CATEGORIES = [
   { id: "agent", label: "Subagent" },
   { id: "command", label: "Command" },
 ] as const;
+type CreateCapabilityCategory = (typeof CREATE_CAPABILITY_CATEGORIES)[number]["id"];
 const COMMON_ITEM_FIELDS: Array<{ field: keyof CommonItemDraft; label: string }> = [
   { field: "name", label: "Name" },
   { field: "description", label: "Description" },
@@ -191,7 +192,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
   const [transferTargetScope, setTransferTargetScope] = useState<ProviderSyncScope>("project");
   const [transferTargetCwd, setTransferTargetCwd] = useState(cwd ?? "");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [newCapabilityCategory, setNewCapabilityCategory] = useState<"skill" | "agent" | "command">("skill");
+  const [newCapabilityCategory, setNewCapabilityCategory] = useState<CreateCapabilityCategory>("skill");
   const [newCapabilityProviders, setNewCapabilityProviders] = useState<string[]>([]);
   const [newCapabilityName, setNewCapabilityName] = useState("");
   const [newCapabilityDescription, setNewCapabilityDescription] = useState("");
@@ -493,6 +494,12 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
     fetchSync,
   ]);
 
+  const openCreateCapability = useCallback((category: CreateCapabilityCategory = "skill") => {
+    setNewCapabilityCategory(category);
+    setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
+    setCreateOpen(true);
+  }, [providerOptions]);
+
   const transferCapability = useCallback(async (capability: ProviderSyncCapability) => {
     if (!canTransferCapability(capability) || !transferTargetScope) return;
     if (transferTargetScope === "project" && !transferTargetCwd) return;
@@ -749,8 +756,11 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                 title="Add capability"
                 disabled={busy || providerOptions.length === 0 || (scope === "project" && !targetCwd)}
                 onClick={() => {
-                  setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
-                  setCreateOpen((current) => !current);
+                  if (createOpen) {
+                    setCreateOpen(false);
+                    return;
+                  }
+                  openCreateCapability();
                 }}
               >
                 +
@@ -762,7 +772,7 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                   aria-label="New capability category"
                   className="provider-sync-select"
                   value={newCapabilityCategory}
-                  onChange={(e) => setNewCapabilityCategory(e.target.value as "skill" | "agent" | "command")}
+                  onChange={(e) => setNewCapabilityCategory(e.target.value as CreateCapabilityCategory)}
                 >
                   {CREATE_CAPABILITY_CATEGORIES.map((category) => (
                     <option key={category.id} value={category.id}>{category.label}</option>
@@ -841,19 +851,33 @@ export function ProviderSyncPage({ open, cwd, onClose, client, subscribeExternal
                   className={`provider-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`}
                   key={group.category}
                 >
-                  <button
-                    type="button"
-                    className="provider-sync-capability-group-title"
-                    aria-expanded={!collapsedGroups[group.category]}
-                    onClick={() => setCollapsedGroups((current) => ({
-                      ...current,
-                      [group.category]: !current[group.category],
-                    }))}
-                  >
-                    <span className="provider-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
-                    <span>{group.label}</span>
-                    <small>{group.capabilities.length}</small>
-                  </button>
+                  <div className="provider-sync-capability-group-header">
+                    <button
+                      type="button"
+                      className="provider-sync-capability-group-title"
+                      aria-expanded={!collapsedGroups[group.category]}
+                      onClick={() => setCollapsedGroups((current) => ({
+                        ...current,
+                        [group.category]: !current[group.category],
+                      }))}
+                    >
+                      <span className="provider-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
+                      <span>{group.label}</span>
+                      <small>{group.capabilities.length}</small>
+                    </button>
+                    {CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && (
+                      <button
+                        type="button"
+                        className="btn-secondary provider-sync-icon-action provider-sync-capability-group-add"
+                        aria-label={`Add ${group.label} capability`}
+                        title={`Add ${group.label} capability`}
+                        disabled={busy || providerOptions.length === 0 || (scope === "project" && !targetCwd)}
+                        onClick={() => openCreateCapability(group.category as CreateCapabilityCategory)}
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
                   {!collapsedGroups[group.category] && (
                     <div className="provider-sync-capability-group-items">
                       {group.capabilities.map((capability) => (
