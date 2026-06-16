@@ -1,7 +1,7 @@
 """Standalone provider-config-sync package smoke test.
 
 Run:
-    cd backend && .venv/bin/python scripts/test_provider_sync_standalone_package.py
+    cd backend && .venv/bin/python scripts/test_provider_config_sync_standalone_package.py
 """
 
 from __future__ import annotations
@@ -145,9 +145,9 @@ def t_standalone_app_loads_json_config() -> None:
         check("/assets/standalone-app.css" in paths, "standalone FastAPI app serves browser CSS asset")
         check("/assets/standalone-app.js" in html and "/assets/standalone-app.css" in html, "standalone HTML references browser assets")
         check(alt_html == html, "standalone browser UI has root and named routes")
-        check("createFetchProviderSyncClient" in js, "standalone browser app uses HTTP API client")
+        check("createFetchProviderConfigSyncClient" in js, "standalone browser app uses HTTP API client")
         check("McpHostBridge" not in js and "tools/call" not in js, "standalone browser app is independent of MCP host bridge")
-        check("provider-sync-page" in css, "standalone browser app serves shared UI styles")
+        check("provider-config-sync-page" in css, "standalone browser app serves shared UI styles")
     finally:
         shutil.rmtree(wipe)
 
@@ -155,18 +155,18 @@ def t_standalone_app_loads_json_config() -> None:
 def t_ui_client_keeps_better_claude_routes_explicit() -> None:
     client = _UI_CLIENT.read_text(encoding="utf-8")
     generic_routes = client.split("export const PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
-        "export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES",
+        "export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES",
         1,
     )[0]
-    better_claude_routes = client.split("export const BETTER_CLAUDE_PROVIDER_SYNC_ROUTES", 1)[1].split(
+    better_claude_routes = client.split("export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
         "function pathWithParams",
         1,
     )[0]
-    check("/api/provider-sync" not in generic_routes, "generic UI client does not depend on Better Claude provider-sync routes")
+    check("/api/provider-config-sync" not in generic_routes, "generic UI client does not depend on Better Claude provider-config-sync routes")
     check("/api/projects" not in generic_routes, "generic UI client does not depend on Better Claude project route")
     check("/api/provider-config-sync" in generic_routes, "generic UI client targets standalone package API")
-    check("/api/provider-sync" in better_claude_routes, "Better Claude route map is explicit")
-    check("createBetterClaudeProviderSyncClient" in client, "Better Claude adapter has a named factory")
+    check("/api/provider-config-sync" in better_claude_routes, "Better Claude route map is explicit")
+    check("createBetterClaudeProviderConfigSyncClient" in client, "Better Claude adapter has a named factory")
 
 
 def t_capability_picker_lists_global_and_known_project_sources() -> None:
@@ -217,9 +217,9 @@ def t_capability_picker_lists_global_and_known_project_sources() -> None:
 
 
 def t_diff_line_editors_hide_textarea_chrome() -> None:
-    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderConfigSyncPage.tsx").read_text(encoding="utf-8")
     styles = _UI_STYLES.read_text(encoding="utf-8")
-    editor_rule = styles.split(".provider-sync-aligned-diff-cell-editor {", 1)[1].split("}", 1)[0]
+    editor_rule = styles.split(".provider-config-sync-aligned-diff-cell-editor {", 1)[1].split("}", 1)[0]
     check("resize: none;" in editor_rule, "diff line editors disable manual resize")
     check("overflow: hidden;" in editor_rule, "diff line editors hide textarea scroll chrome")
     check("scrollbar-width: none;" in editor_rule, "diff line editors hide firefox scrollbars")
@@ -227,11 +227,11 @@ def t_diff_line_editors_hide_textarea_chrome() -> None:
     check("useLayoutEffect" in page, "diff line editors resize after layout")
     check("scrollHeight" in page, "diff line editors grow to wrapped content height")
     check(
-        ".provider-sync-aligned-diff-cell-editor::-webkit-resizer" in styles,
+        ".provider-config-sync-aligned-diff-cell-editor::-webkit-resizer" in styles,
         "diff line editors hide webkit resize handles",
     )
     check(
-        ".provider-sync-aligned-diff-cell-editor::-webkit-scrollbar" in styles,
+        ".provider-config-sync-aligned-diff-cell-editor::-webkit-scrollbar" in styles,
         "diff line editors hide webkit scrollbars",
     )
 
@@ -239,21 +239,21 @@ def t_diff_line_editors_hide_textarea_chrome() -> None:
 def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
     styles = _UI_STYLES.read_text(encoding="utf-8")
     for selector in (
-        ".provider-sync-main",
-        ".provider-sync-editor-card",
-        ".provider-sync-structured",
-        ".provider-sync-aligned-diff",
-        ".provider-sync-aligned-diff-body",
-        ".provider-sync-specifics-card",
-        ".provider-sync-specifics",
+        ".provider-config-sync-main",
+        ".provider-config-sync-editor-card",
+        ".provider-config-sync-structured",
+        ".provider-config-sync-aligned-diff",
+        ".provider-config-sync-aligned-diff-body",
+        ".provider-config-sync-specifics-card",
+        ".provider-config-sync-specifics",
     ):
         rule = styles.split(f"{selector} {{", 1)[1].split("}", 1)[0]
         check("overflow: visible;" in rule, f"{selector} does not create an internal scroll view")
 
-    shell_rule = styles.split(".provider-sync-shell {", 1)[1].split("}", 1)[0]
-    editor_grid_rule = styles.split(".provider-sync-editor-grid {", 1)[1].split("}", 1)[0]
-    diff_body_rule = styles.split(".provider-sync-aligned-diff-body {", 1)[1].split("}", 1)[0]
-    specifics_rule = styles.split(".provider-sync-specifics {", 1)[1].split("}", 1)[0]
+    shell_rule = styles.split(".provider-config-sync-shell {", 1)[1].split("}", 1)[0]
+    editor_grid_rule = styles.split(".provider-config-sync-editor-grid {", 1)[1].split("}", 1)[0]
+    diff_body_rule = styles.split(".provider-config-sync-aligned-diff-body {", 1)[1].split("}", 1)[0]
+    specifics_rule = styles.split(".provider-config-sync-specifics {", 1)[1].split("}", 1)[0]
     check("flex: 1 0 auto;" in shell_rule, "shell can grow past the viewport")
     check("flex: 0 0 auto;" in editor_grid_rule, "editor grid uses content height")
     check("flex: 0 0 auto;" in diff_body_rule, "diff body uses content height")
@@ -261,18 +261,18 @@ def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
 
 
 def t_file_actions_live_in_diff_header() -> None:
-    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderConfigSyncPage.tsx").read_text(encoding="utf-8")
     styles = _UI_STYLES.read_text(encoding="utf-8")
-    check("provider-sync-counterpart-actions" not in page, "file action buttons are not rendered above the diff")
-    check("provider-sync-counterpart-actions" not in styles, "stale counterpart action styles are removed")
+    check("provider-config-sync-counterpart-actions" not in page, "file action buttons are not rendered above the diff")
+    check("provider-config-sync-counterpart-actions" not in styles, "stale counterpart action styles are removed")
     check("unifiedHeaderActions=" in page, "unified file actions are passed to the diff header")
     check("specificHeaderActions=" in page, "specific file actions are passed to the diff header")
-    check("provider-sync-aligned-diff-header-actions" in page, "diff header renders action slots")
-    check("provider-sync-aligned-diff-header-actions" in styles, "diff header action slots are styled")
+    check("provider-config-sync-aligned-diff-header-actions" in page, "diff header renders action slots")
+    check("provider-config-sync-aligned-diff-header-actions" in styles, "diff header action slots are styled")
 
 
 def t_diff_text_edits_preserve_focus() -> None:
-    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderConfigSyncPage.tsx").read_text(encoding="utf-8")
     unified_change = page.split("onUnifiedChange={(lineNumber, fallbackIndex, content) => {", 1)[1].split("}}", 1)[0]
     specific_change = page.split("onSpecificChange={(lineNumber, fallbackIndex, content) => {", 1)[1].split("}}", 1)[0]
     check("updateDraft(" in unified_change, "unified text edits update draft state")
@@ -284,20 +284,20 @@ def t_diff_text_edits_preserve_focus() -> None:
 
 
 def t_editable_diff_text_is_selectable_across_rows() -> None:
-    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderConfigSyncPage.tsx").read_text(encoding="utf-8")
     styles = _UI_STYLES.read_text(encoding="utf-8")
     cell = page.split("function EditableDiffCell(", 1)[1].split("function diffCellTone(", 1)[0]
-    text_rule = styles.rsplit(".provider-sync-aligned-diff-cell-text {", 1)[1].split("}", 1)[0]
+    text_rule = styles.rsplit(".provider-config-sync-aligned-diff-cell-text {", 1)[1].split("}", 1)[0]
     check("if (!active)" in cell, "editable diff cells render selectable text when not actively editing")
-    check('className="provider-sync-aligned-diff-cell-text"' in cell, "editable diff cells expose selectable text nodes")
+    check('className="provider-config-sync-aligned-diff-cell-text"' in cell, "editable diff cells expose selectable text nodes")
     check("<textarea" in cell and "activeEditorKey" in page, "editable diff cells only use textarea for the active editor")
     check("onDoubleClick" in cell, "editable diff selectable text can still enter edit mode")
     check("user-select: text;" in text_rule, "editable diff selectable text allows browser range selection")
 
 
 def t_structured_skill_fields_use_editable_side_by_side_diffs() -> None:
-    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderSyncPage.tsx").read_text(encoding="utf-8")
-    structured_view = page.split("function StructuredSpecificView(", 1)[1].split("function ProviderSyncPageSettings(", 1)[0]
+    page = (_ROOT / "packages" / "provider-config-sync-ui" / "src" / "ProviderConfigSyncPage.tsx").read_text(encoding="utf-8")
+    structured_view = page.split("function StructuredSpecificView(", 1)[1].split("function ProviderConfigSyncPageSettings(", 1)[0]
     field_diffs = page.split("function StructuredEditableFieldDiffs(", 1)[1].split("function StructuredParseError(", 1)[0]
     check("StructuredEditableFieldDiffs" in structured_view, "structured skills render field-level side-by-side diffs")
     check("CommonItemFields item={item} readOnly" not in structured_view, "structured skills do not use read-only field cards")
@@ -341,8 +341,8 @@ def t_mcp_server_exposes_sync_tools() -> None:
     resource = next(item for item in resources if str(item.uri) == "ui://provider-config-sync/main")
     check(resource.mimeType == "text/html;profile=mcp-app", "MCP App resource uses MCP App HTML mime type")
     content = list(asyncio.run(server.read_resource("ui://provider-config-sync/main")))[0]
-    check("ProviderSyncPage" in content.content, "MCP App serves the shared React provider sync page")
-    check("provider-sync-page" in content.content, "MCP App embeds shared provider sync styles")
+    check("ProviderConfigSyncPage" in content.content, "MCP App serves the shared React provider config sync page")
+    check("provider-config-sync-page" in content.content, "MCP App embeds shared provider config sync styles")
     check("McpHostBridge" in content.content and "tools/call" in content.content, "MCP App adapts React client calls to MCP tools")
     check("create_provider_config_capability" in content.content, "MCP App can create capabilities through MCP")
     check("transfer_provider_config_capability" in content.content, "MCP App can transfer capabilities through MCP")
@@ -448,7 +448,7 @@ def t_automation_builds_noninteractive_agent_commands() -> None:
                 check("--cd" in command and "--sandbox" in command, "Codex automation uses exec workspace mode")
                 check(
                     any("default_tools_approval_mode" in item and '"approve"' in item for item in command),
-                    "Codex automation approves provider sync MCP tools",
+                    "Codex automation approves provider config sync MCP tools",
                 )
             if provider == "gemini":
                 check(command[:2] == ["gemini", "--prompt"], "Gemini automation uses prompt mode")

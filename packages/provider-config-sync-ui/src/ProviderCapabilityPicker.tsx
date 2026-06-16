@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
-  ProviderSyncCapabilityPickerOutput,
-  ProviderSyncCapabilityPickerSource,
-  ProviderSyncScope,
+  ProviderConfigSyncCapabilityPickerOutput,
+  ProviderConfigSyncCapabilityPickerSource,
+  ProviderConfigSyncScope,
 } from "@better-agent/provider-config-sync-core";
-import { type ProviderSyncApiClient } from "./client.js";
+import { type ProviderConfigSyncApiClient } from "./client.js";
 
 export interface ProviderCapabilityPickerProps {
   open: boolean;
   cwd?: string;
-  client: Pick<ProviderSyncApiClient, "listCapabilityPickerSources">;
-  onSelect: (source: ProviderSyncCapabilityPickerSource, output?: ProviderSyncCapabilityPickerOutput) => void;
+  client: Pick<ProviderConfigSyncApiClient, "listCapabilityPickerSources">;
+  onSelect: (source: ProviderConfigSyncCapabilityPickerSource, output?: ProviderConfigSyncCapabilityPickerOutput) => void;
   onClose?: () => void;
 }
 
-const SCOPE_LABELS: Record<ProviderSyncScope, string> = {
+const SCOPE_LABELS: Record<ProviderConfigSyncScope, string> = {
   global: "Global",
   project: "Project",
 };
@@ -28,7 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   command: "Commands",
 };
 
-function sourceSearchText(source: ProviderSyncCapabilityPickerSource): string {
+function sourceSearchText(source: ProviderConfigSyncCapabilityPickerSource): string {
   return [
     source.source_label,
     source.source_cwd,
@@ -46,9 +46,9 @@ function formatTokens(count: number): string {
 }
 
 export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onClose }: ProviderCapabilityPickerProps) {
-  const [sources, setSources] = useState<ProviderSyncCapabilityPickerSource[]>([]);
+  const [sources, setSources] = useState<ProviderConfigSyncCapabilityPickerSource[]>([]);
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<ProviderSyncScope | "all">("all");
+  const [scope, setScope] = useState<ProviderConfigSyncScope | "all">("all");
   const [providerKind, setProviderKind] = useState("all");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,7 +85,7 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
     return [...byKind.entries()].map(([kind, name]) => ({ kind, name }));
   }, [sources]);
 
-  const selectSource = (source: ProviderSyncCapabilityPickerSource) => {
+  const selectSource = (source: ProviderConfigSyncCapabilityPickerSource) => {
     if (providerKind === "all") {
       onSelect(source);
       return;
@@ -107,22 +107,22 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
 
       <div className="provider-capability-picker-toolbar">
         <input
-          className="provider-sync-input"
+          className="provider-config-sync-input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search capabilities"
         />
         <select
-          className="provider-sync-select"
+          className="provider-config-sync-select"
           value={scope}
-          onChange={(event) => setScope(event.target.value as ProviderSyncScope | "all")}
+          onChange={(event) => setScope(event.target.value as ProviderConfigSyncScope | "all")}
         >
           <option value="all">All scopes</option>
           <option value="global">Global</option>
           <option value="project">Project</option>
         </select>
         <select
-          className="provider-sync-select"
+          className="provider-config-sync-select"
           value={providerKind}
           onChange={(event) => setProviderKind(event.target.value)}
         >
@@ -133,9 +133,9 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
         </select>
       </div>
 
-      {error && <div className="provider-sync-error">{error}</div>}
-      {busy && <div className="provider-sync-loading">Loading capabilities...</div>}
-      {!busy && filtered.length === 0 && <div className="provider-sync-empty">No capabilities found.</div>}
+      {error && <div className="provider-config-sync-error">{error}</div>}
+      {busy && <div className="provider-config-sync-loading">Loading capabilities...</div>}
+      {!busy && filtered.length === 0 && <div className="provider-config-sync-empty">No capabilities found.</div>}
 
       <div className="provider-capability-picker-list">
         {filtered.map((source) => (
@@ -149,7 +149,7 @@ export function ProviderCapabilityPicker({ open, cwd = "", client, onSelect, onC
               <small>{CATEGORY_LABELS[source.capability.category] ?? source.capability.category}</small>
             </span>
             <span>
-              <em>{SCOPE_LABELS[source.source_scope as ProviderSyncScope]} · {source.source_label}</em>
+              <em>{SCOPE_LABELS[source.source_scope as ProviderConfigSyncScope]} · {source.source_label}</em>
               <small>
                 {providerKind === "all"
                   ? `${source.outputs.length} provider forms`

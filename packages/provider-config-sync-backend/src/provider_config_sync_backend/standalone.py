@@ -58,10 +58,14 @@ def configure_from_file(config_path: str | Path | None = None) -> None:
     providers = _records(config.get("providers"), "providers") or _default_providers()
     projects = _records(config.get("projects"), "projects")
     sync_home = _expand_path(config.get("sync_home") or os.environ.get("PROVIDER_CONFIG_SYNC_HOME") or "~/.provider-config-sync")
+    change_webhook_url = config.get("change_webhook_url") or os.environ.get("PROVIDER_CONFIG_SYNC_CHANGE_WEBHOOK_URL")
+    change_webhook_token = os.environ.get("PROVIDER_CONFIG_SYNC_BROADCAST_TOKEN")
     configure(
         provider_records=lambda: providers,
         project_records=lambda: projects,
         sync_home=lambda: sync_home,
+        change_webhook_url=change_webhook_url,
+        change_webhook_token=change_webhook_token,
     )
 
 

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { ProviderSyncPage } from "./ProviderSyncPage.js";
+import { ProviderConfigSyncPage } from "./ProviderConfigSyncPage.js";
 import type {
-  ProviderSyncApiClient,
-  ProviderSyncProject,
-  ProviderSyncUpdateSettingsRequest,
+  ProviderConfigSyncApiClient,
+  ProviderConfigSyncProject,
+  ProviderConfigSyncUpdateSettingsRequest,
 } from "./client.js";
 import "./styles.css";
 
@@ -82,13 +82,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function createMcpProviderSyncClient(host: McpHostBridge): ProviderSyncApiClient {
+function createMcpProviderConfigSyncClient(host: McpHostBridge): ProviderConfigSyncApiClient {
   return {
     listProjects: () =>
-      host.callTool<{ projects?: ProviderSyncProject[] }>("list_provider_config_projects")
+      host.callTool<{ projects?: ProviderConfigSyncProject[] }>("list_provider_config_projects")
         .then((body) => body.projects ?? []),
     getState: (cwd) => host.callTool("get_provider_config_state", { cwd }),
-    updateAutoSettings: (body: ProviderSyncUpdateSettingsRequest) =>
+    updateAutoSettings: (body: ProviderConfigSyncUpdateSettingsRequest) =>
       host.callTool("update_provider_config_auto_settings", body as unknown as Record<string, unknown>),
     writeFile: (body) =>
       host.callTool("write_provider_config_entry", body as unknown as Record<string, unknown>).then(() => undefined),
@@ -109,7 +109,7 @@ function createMcpProviderSyncClient(host: McpHostBridge): ProviderSyncApiClient
   };
 }
 
-function McpProviderSyncApp({ host }: { host: McpHostBridge }) {
+function McpProviderConfigSyncApp({ host }: { host: McpHostBridge }) {
   useEffect(() => {
     const observer = new MutationObserver(() => host.resize());
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
@@ -119,11 +119,11 @@ function McpProviderSyncApp({ host }: { host: McpHostBridge }) {
   }, [host]);
 
   return (
-    <ProviderSyncPage
+    <ProviderConfigSyncPage
       open
       cwd={null}
       onClose={() => undefined}
-      client={createMcpProviderSyncClient(host)}
+      client={createMcpProviderConfigSyncClient(host)}
     />
   );
 }
@@ -134,4 +134,4 @@ if (!rootElement) {
 }
 
 const host = new McpHostBridge();
-createRoot(rootElement).render(<McpProviderSyncApp host={host} />);
+createRoot(rootElement).render(<McpProviderConfigSyncApp host={host} />);

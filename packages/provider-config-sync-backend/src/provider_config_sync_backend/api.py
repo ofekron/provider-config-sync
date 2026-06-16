@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import difflib
 import json
@@ -13,7 +14,9 @@ import stat
 import tempfile
 import threading
 import tomllib
-from dataclasses import dataclass
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -86,6 +89,43 @@ _broadcast_changed_source: Callable[[str, str, str, str, str], Any] = _noop_broa
 _llm_review_source: Callable[[dict[str, Any]], list[str]] | None = None
 
 
+def _make_webhook_broadcast(
+    url: str, token: str | None
+) -> Callable[[str, str, str, str, str], Any]:
+    """Build a broadcast callback that POSTs the change fact to an HTTP
+    webhook. Used when this package runs out-of-process (e.g. as a stdio
+    MCP subprocess) and cannot share an in-process broadcast callback with
+    its host. Best-effort: a failed POST is logged, never raised."""
+
+    def _webhook_broadcast(
+        scope: str, category: str, capability_id: str, path: str, cwd: str
+    ) -> Any:
+        payload = json.dumps(
+            {
+                "scope": scope,
+                "category": category,
+                "capability_id": capability_id,
+                "path": path,
+                "cwd": cwd,
+            }
+        ).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["X-Internal-Token"] = token
+
+        def _post() -> None:
+            request = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    response.read()
+            except Exception:
+                logger.warning("provider-config-sync change webhook failed", exc_info=True)
+
+        return asyncio.to_thread(_post)
+
+    return _webhook_broadcast
+
+
 def configure(
     *,
     provider_records: Callable[[], list[dict]] | None = None,
@@ -93,6 +133,8 @@ def configure(
     sync_home: Callable[[], Path] | None = None,
     encode_project_cwd: Callable[[str], str] | None = None,
     broadcast_changed: Callable[[str, str, str, str, str], Any] | None = None,
+    change_webhook_url: str | None = None,
+    change_webhook_token: str | None = None,
     llm_review: Callable[[dict[str, Any]], list[str]] | None = None,
 ) -> None:
     global _provider_records_source
@@ -111,6 +153,10 @@ def configure(
         _encode_cwd_source = encode_project_cwd
     if broadcast_changed is not None:
         _broadcast_changed_source = broadcast_changed
+    elif change_webhook_url:
+        _broadcast_changed_source = _make_webhook_broadcast(
+            change_webhook_url, change_webhook_token
+        )
     if llm_review is not None:
         _llm_review_source = llm_review
 
@@ -128,6 +174,7 @@ class Candidate:
     language: str
     can_create: bool
     content_kind: str = "file"
+    provider_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -237,6 +284,18 @@ def _provider_config_dir(provider: dict) -> Path:
     kind = provider.get("kind", "")
     raw = provider.get("config_dir") or _DEFAULT_CONFIG_DIR.get(kind, "")
     return _expand_path(raw).resolve()
+
+
+def _provider_key(provider: dict) -> str:
+    """Stable unique identity for a provider. `kind` alone is NOT unique:
+    Better Claude registers Z.AI as a second `kind:"claude"` provider (a
+    separate Anthropic-compatible config dir). kind+resolved-config-dir is."""
+    return f"{provider.get('kind', '')}:{_provider_config_dir(provider)}"
+
+
+def _stamp_provider_key(provider: dict, candidates: list[Candidate]) -> list[Candidate]:
+    key = _provider_key(provider)
+    return [replace(candidate, provider_key=key) for candidate in candidates]
 
 
 def _global_instruction_candidates(provider: dict) -> list[Candidate]:
@@ -1464,6 +1523,7 @@ def _entry_from_candidate(candidate: Candidate) -> dict:
         "disabled": _is_disabled_path(path),
         "provider_names": [candidate.provider_name],
         "provider_kinds": [candidate.provider_kind],
+        "provider_keys": [candidate.provider_key],
     }
 
 
@@ -1501,6 +1561,9 @@ def _merge_entry(entry: dict, by_entry: dict[str, dict]) -> None:
     for provider_kind in entry["provider_kinds"]:
         if provider_kind not in current["provider_kinds"]:
             current["provider_kinds"].append(provider_kind)
+    for provider_key in entry["provider_keys"]:
+        if provider_key not in current["provider_keys"]:
+            current["provider_keys"].append(provider_key)
 
 
 def _entry_from_candidates(candidate: Candidate, by_entry: dict[str, dict]) -> None:
@@ -1645,6 +1708,7 @@ def _unified_entry(
         "disabled": False,
         "provider_names": ["Unified"],
         "provider_kinds": ["unified"],
+        "provider_keys": ["unified"],
     }
 
 
@@ -1688,32 +1752,38 @@ def _capability_from_item(
 
 
 def _provider_token_counts(entries: list[dict]) -> list[dict]:
-    by_key: dict[tuple[str, str], int] = {}
+    by_key: dict[tuple[str, str, str], int] = {}
     for entry in entries:
-        for provider_kind, provider_name in zip(entry["provider_kinds"], entry["provider_names"], strict=False):
-            key = (provider_kind, provider_name)
+        zipped = zip(
+            entry["provider_keys"],
+            entry["provider_kinds"],
+            entry["provider_names"],
+            strict=False,
+        )
+        for provider_key, provider_kind, provider_name in zipped:
+            key = (provider_key, provider_kind, provider_name)
             by_key[key] = by_key.get(key, 0) + entry["token_count"]
     return [
-        {"provider_kind": kind, "provider_name": name, "token_count": count}
-        for (kind, name), count in sorted(by_key.items(), key=lambda item: (item[0][0], item[0][1]))
+        {"provider_key": pkey, "provider_kind": kind, "provider_name": name, "token_count": count}
+        for (pkey, kind, name), count in sorted(by_key.items(), key=lambda item: (item[0][1], item[0][2]))
     ]
 
 
 def _token_totals(capabilities: list[dict]) -> dict:
     unified = sum(capability["unified_token_count"] for capability in capabilities)
     specifics = sum(capability["specific_token_count"] for capability in capabilities)
-    provider_counts: dict[tuple[str, str], int] = {}
+    provider_counts: dict[tuple[str, str, str], int] = {}
     for capability in capabilities:
         for item in capability["provider_token_counts"]:
-            key = (item["provider_kind"], item["provider_name"])
+            key = (item["provider_key"], item["provider_kind"], item["provider_name"])
             provider_counts[key] = provider_counts.get(key, 0) + item["token_count"]
     return {
         "unified": unified,
         "specifics": specifics,
         "all_tracked": unified + specifics,
         "by_provider": [
-            {"provider_kind": kind, "provider_name": name, "token_count": count}
-            for (kind, name), count in sorted(provider_counts.items(), key=lambda item: (item[0][0], item[0][1]))
+            {"provider_key": pkey, "provider_kind": kind, "provider_name": name, "token_count": count}
+            for (pkey, kind, name), count in sorted(provider_counts.items(), key=lambda item: (item[0][1], item[0][2]))
         ],
     }
 
@@ -1783,7 +1853,7 @@ def _read_auto_sync_settings() -> dict:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        raise HTTPException(status_code=409, detail=f"provider sync settings are unreadable: {e}")
+        raise HTTPException(status_code=409, detail=f"provider config sync settings are unreadable: {e}")
     return _clean_auto_sync_settings(raw.get("auto_sync") if isinstance(raw, dict) else {})
 
 
@@ -1839,7 +1909,7 @@ def _effective_auto_sync_policy(settings: dict, cwd: str = "", capability_id: st
 def get_auto_sync_settings(cwd: str = "", capability_id: str = "") -> dict:
     normalized_cwd = _normalize_settings_cwd(cwd)
     if capability_id and not _valid_capability_id(capability_id):
-        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+        raise HTTPException(status_code=400, detail="invalid provider config sync capability id")
     settings = _read_auto_sync_settings()
     return {
         **settings,
@@ -1852,7 +1922,7 @@ def update_auto_sync_settings(req: AutoSyncSettingsPatch) -> dict:
         raise HTTPException(status_code=400, detail="invalid auto-sync settings level")
     capability_id = req.capability_id
     if capability_id and not _valid_capability_id(capability_id):
-        raise HTTPException(status_code=400, detail="invalid provider sync capability id")
+        raise HTTPException(status_code=400, detail="invalid provider config sync capability id")
     cwd = _normalize_settings_cwd(req.cwd)
     settings = _read_auto_sync_settings()
     cleaned = _clean_auto_sync_policy(req.policy, allow_partial=req.level != "global")
@@ -1903,13 +1973,13 @@ def _discover(cwd: str) -> dict:
     global_agent_names = _agent_names(providers, "global")
     global_command_names = _command_names(providers, "global")
     for provider in providers:
-        for candidate in [
+        for candidate in _stamp_provider_key(provider, [
             *_global_instruction_candidates(provider),
             *_global_config_candidates(provider),
             *_global_skill_candidates(provider, global_skill_names),
             *_agent_candidates(provider, "global", global_agent_names),
             *_command_candidates(provider, "global", global_command_names),
-        ]:
+        ]):
             _entry_from_candidates(candidate, by_entry)
 
     if cwd:
@@ -1930,7 +2000,7 @@ def _discover(cwd: str) -> dict:
                     *_agent_candidates(provider, "project", project_agent_names, project_root),
                     *_command_candidates(provider, "project", project_command_names, project_root),
                 ]
-                for candidate in candidates:
+                for candidate in _stamp_provider_key(provider, candidates):
                     _entry_from_candidates(candidate, by_entry)
 
     specifics = [by_entry[key] for key in sorted(by_entry)]
@@ -1973,7 +2043,11 @@ def _discover(cwd: str) -> dict:
         "files": files,
         "capabilities": capabilities,
         "providers": [
-            {"kind": provider["kind"], "name": provider.get("name") or provider["kind"]}
+            {
+                "key": _provider_key(provider),
+                "kind": provider["kind"],
+                "name": provider.get("name") or provider["kind"],
+            }
             for provider in providers
         ],
         "token_totals": _token_totals(capabilities),
@@ -2372,12 +2446,12 @@ async def _broadcast_changed(scope: str, category: str, capability_id: str, path
 
 
 @router.get("")
-async def get_provider_sync(cwd: str = Query("", description="Project cwd for project-scope native files")):
+async def get_provider_config_sync(cwd: str = Query("", description="Project cwd for project-scope native files")):
     return _discover(cwd)
 
 
 @router.get("/projects")
-async def list_provider_sync_projects():
+async def list_provider_config_sync_projects():
     projects = []
     for project in _project_records_source():
         path = project.get("path")
@@ -2549,7 +2623,7 @@ class CreateCapabilityRequest(BaseModel):
     cwd: str = ""
     scope: str
     category: str
-    provider_kinds: list[str]
+    provider_keys: list[str]
     name: str
     description: str = ""
     instructions: str = ""
@@ -2566,15 +2640,15 @@ class TransferCapabilityRequest(BaseModel):
     expected_contents: dict[str, str | None]
 
 
-def _providers_by_kinds(provider_kinds: list[str]) -> list[dict]:
-    requested = [kind for kind in dict.fromkeys(provider_kinds) if kind]
+def _providers_by_keys(provider_keys: list[str]) -> list[dict]:
+    requested = [key for key in dict.fromkeys(provider_keys) if key]
     if not requested:
         raise HTTPException(status_code=400, detail="at least one provider is required")
-    providers = {provider["kind"]: provider for provider in _provider_records()}
-    missing = [kind for kind in requested if kind not in providers]
+    providers = {_provider_key(provider): provider for provider in _provider_records()}
+    missing = [key for key in requested if key not in providers]
     if missing:
-        raise HTTPException(status_code=400, detail=f"unknown provider kind: {', '.join(missing)}")
-    return [providers[kind] for kind in requested]
+        raise HTTPException(status_code=400, detail=f"unknown provider: {', '.join(missing)}")
+    return [providers[key] for key in requested]
 
 
 def _project_root_for_scope(scope: str, cwd: str) -> Path | None:
@@ -2604,7 +2678,7 @@ def _new_capability_candidate(req: CreateCapabilityRequest, provider: dict, proj
         raise HTTPException(status_code=400, detail="category must be agent, command, or skill")
     if not candidates:
         raise HTTPException(status_code=400, detail="provider does not support creating that capability")
-    return candidates[0]
+    return _stamp_provider_key(provider, candidates)[0]
 
 
 def _new_capability_content(req: CreateCapabilityRequest) -> str:
@@ -2756,7 +2830,7 @@ async def delete_capability_route(req: DeleteCapabilityRequest):
 
 
 async def create_capability(req: CreateCapabilityRequest):
-    providers = _providers_by_kinds(req.provider_kinds)
+    providers = _providers_by_keys(req.provider_keys)
     project_root = _project_root_for_scope(req.scope, req.cwd)
     candidates = [_new_capability_candidate(req, provider, project_root) for provider in providers]
     entries = _merged_entries_from_candidates(candidates)
@@ -2811,7 +2885,7 @@ def _transfer_capability_targets(req: TransferCapabilityRequest, source: dict) -
         cwd=req.target_cwd,
         scope=req.target_scope,
         category=source["category"],
-        provider_kinds=[provider["kind"] for provider in providers],
+        provider_keys=[_provider_key(provider) for provider in providers],
         name=_common_item_name_from_capability(source),
     )
     candidates = [_new_capability_candidate(create_req, provider, target_project_root) for provider in providers]
@@ -2854,9 +2928,9 @@ async def transfer_capability(req: TransferCapabilityRequest):
             if not entry["writable"]:
                 raise HTTPException(status_code=400, detail="target capability is not writable")
         source_by_provider = {
-            entry["provider_kinds"][0]: entry
+            entry["provider_keys"][0]: entry
             for entry in latest_source_entries
-            if entry["exists"] and entry["provider_kinds"]
+            if entry["exists"] and entry["provider_keys"]
         }
         unified_source = latest_source["unified"] if latest_source["unified"]["exists"] else None
         fallback_source = unified_source or next((entry for entry in latest_source["specifics"] if entry["exists"]), None)
@@ -2864,7 +2938,7 @@ async def transfer_capability(req: TransferCapabilityRequest):
             raise HTTPException(status_code=400, detail="source capability has no content to transfer")
         _write_entry_if_unchanged(latest_target_unified, None, fallback_source["content"])
         for target in latest_target_entries:
-            source_entry = source_by_provider.get(target["provider_kinds"][0], fallback_source)
+            source_entry = source_by_provider.get(target["provider_keys"][0], fallback_source)
             _write_entry_if_unchanged(target, None, source_entry["content"])
         if req.mode == "move":
             for entry in latest_source_entries:

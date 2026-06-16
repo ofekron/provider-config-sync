@@ -129,6 +129,12 @@ function insertionIndexFor(
   return lineCount;
 }
 
+function insertionIndexFromRowKey(row: AlignedDiffRow, target: "unified" | "specific"): number | null {
+  const match = /^(added|removed):(\d+):(\d+)$/.exec(row.key);
+  if (!match) return null;
+  return Number(match[target === "unified" ? 2 : 3]);
+}
+
 export function applyRowsToContent(
   content: string,
   rows: AlignedDiffRow[],
@@ -145,7 +151,9 @@ export function applyRowsToContent(
       return;
     }
     if (targetLine === null && sourceLine !== null) {
-      const index = insertionIndexFor(rows, rowIndex, target, lines.length) + offset;
+      const baseIndex = insertionIndexFromRowKey(row, target)
+        ?? insertionIndexFor(rows, rowIndex, target, lines.length);
+      const index = baseIndex + offset;
       lines.splice(Math.min(Math.max(index, 0), lines.length), 0, sourceText);
       offset += 1;
       return;
