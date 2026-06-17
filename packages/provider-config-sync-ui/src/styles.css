@@ -853,6 +853,11 @@
   outline-offset: -2px;
 }
 
+.provider-config-sync-aligned-diff-row-wrap.selected .provider-config-sync-aligned-diff-row {
+  outline: 1px solid rgba(88, 166, 255, 0.65);
+  outline-offset: -1px;
+}
+
 .provider-config-sync-aligned-diff-row.editable {
   grid-template-columns: 42px minmax(0, 1fr) 92px 42px minmax(0, 1fr);
 }
@@ -885,6 +890,42 @@
   padding: 3px;
   border-left: 1px solid rgba(139, 148, 158, 0.16);
   border-right: 1px solid rgba(139, 148, 158, 0.16);
+}
+
+.provider-config-sync-selected-row-actions {
+  width: 100%;
+  padding-top: 2px;
+  border-top: 1px solid rgba(139, 148, 158, 0.16);
+}
+
+.provider-config-sync-selected-row-actions span {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.provider-config-sync-clear-selected-rows-button {
+  min-width: 42px;
+}
+
+.provider-config-sync-select-row-control {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.provider-config-sync-select-row-control input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .provider-config-sync-line-number {

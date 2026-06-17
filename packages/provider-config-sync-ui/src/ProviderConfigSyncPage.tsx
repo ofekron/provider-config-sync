@@ -1736,14 +1736,19 @@ function DiffBlockControls({
   leftLabel,
   rightLabel,
   onNextDiff,
+  selectedRows,
+  onClearSelectedRows,
 }: {
   counts: ReturnType<typeof diffCounts>;
   editable?: EditableDiffControls;
   leftLabel: string;
   rightLabel: string;
   onNextDiff: () => void;
+  selectedRows: AlignedDiffRow[];
+  onClearSelectedRows: () => void;
 }) {
   const changedCount = counts.added + counts.removed + counts.changed;
+  const selectedCount = selectedRows.length;
   return (
     <div className="provider-config-sync-aligned-diff-block-controls">
       <strong>{changedCount === 0 ? "Aligned" : diffCountsLabel(counts)}</strong>
@@ -1766,6 +1771,34 @@ function DiffBlockControls({
             label={`Apply block to ${rightLabel}`}
             onClick={editable.onApplyRightBlock}
           />
+          {selectedCount > 0 && (
+            <div className="provider-config-sync-selected-row-actions">
+              <span>{selectedCount} rows</span>
+              <ArrowApplyButton
+                direction="left"
+                label={`Apply ${selectedCount} selected rows to ${leftLabel}`}
+                onClick={() => {
+                  editable.onApplyLeftRows(selectedRows);
+                  onClearSelectedRows();
+                }}
+              />
+              <ArrowApplyButton
+                direction="right"
+                label={`Apply ${selectedCount} selected rows to ${rightLabel}`}
+                onClick={() => {
+                  editable.onApplyRightRows(selectedRows);
+                  onClearSelectedRows();
+                }}
+              />
+              <button
+                type="button"
+                className="btn-secondary provider-config-sync-clear-selected-rows-button"
+                onClick={onClearSelectedRows}
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1844,12 +1877,18 @@ function AlignedDiffView({
   const nextDiffIndex = useRef(0);
   const [highlightedDiffKey, setHighlightedDiffKey] = useState<string | null>(null);
   const [activeEditorKey, setActiveEditorKey] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(() => new Set());
+  const selectedRows = useMemo(
+    () => rows.filter((row) => row.kind !== "same" && selectedRowKeys.has(row.key)),
+    [rows, selectedRowKeys],
+  );
 
   useEffect(() => {
     nextDiffIndex.current = 0;
     diffRowNodes.current.clear();
     setHighlightedDiffKey(null);
     setActiveEditorKey(null);
+    setSelectedRowKeys(new Set());
   }, [unifiedContent, specificContent]);
 
   const registerDiffRow = useCallback((key: string, node: HTMLDivElement | null) => {
@@ -1874,6 +1913,22 @@ function AlignedDiffView({
     setActiveEditorKey((current) => (current === key ? null : current));
   }, []);
 
+  const toggleSelectedRow = useCallback((key: string) => {
+    setSelectedRowKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+        return next;
+      }
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  const clearSelectedRows = useCallback(() => {
+    setSelectedRowKeys(new Set());
+  }, []);
+
   return (
     <div className={`${className ? `${className} ` : ""}provider-config-sync-aligned-diff`}>
       <div className="provider-config-sync-aligned-diff-header">
@@ -1896,6 +1951,8 @@ function AlignedDiffView({
           leftLabel={leftLabel}
           rightLabel={rightLabel}
           onNextDiff={goToNextDiff}
+          selectedRows={selectedRows}
+          onClearSelectedRows={clearSelectedRows}
         />
         {editable ? (
           <DiffHeaderSide
@@ -1916,9 +1973,10 @@ function AlignedDiffView({
           const hunk = hunkByFirstRow.get(row.key);
           const changed = row.kind !== "same";
           const renderKey = editable ? editableDiffRowKey(row, index) : row.key;
+          const selected = selectedRowKeys.has(row.key);
           return (
             <div
-              className={`provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`}
+              className={`provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}${selected ? " selected" : ""}`}
               key={renderKey}
               ref={(node) => {
                 if (changed) registerDiffRow(row.key, node);
@@ -1963,18 +2021,15 @@ function AlignedDiffView({
                 {editable && (
                   <div className="provider-config-sync-aligned-diff-line-controls">
                     {row.kind !== "same" && (
-                      <>
-                        <ArrowApplyButton
-                          direction="left"
-                          label={`Apply line to ${leftLabel}`}
-                          onClick={() => editable.onApplyLeftRows([row])}
+                      <label className="provider-config-sync-select-row-control">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          aria-label={`Select diff entry ${index + 1} for selected rows apply`}
+                          onChange={() => toggleSelectedRow(row.key)}
                         />
-                        <ArrowApplyButton
-                          direction="right"
-                          label={`Apply line to ${rightLabel}`}
-                          onClick={() => editable.onApplyRightRows([row])}
-                        />
-                      </>
+                        <span>Select</span>
+                      </label>
                     )}
                   </div>
                 )}

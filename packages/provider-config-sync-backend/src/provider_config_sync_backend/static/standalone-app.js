@@ -24809,7 +24809,7 @@
   function canTransferCapability(capability) {
     return capability.category === "skill" || capability.category === "agent" || capability.category === "command";
   }
-  function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }) {
+  function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges, initialCapabilityId, embedded }) {
     const [data, setData] = (0, import_react.useState)(null);
     const [projects, setProjects] = (0, import_react.useState)([]);
     const [scope, setScope] = (0, import_react.useState)("project");
@@ -24927,6 +24927,13 @@
       [data?.providers]
     );
     const selectedCapability = capabilities.find((capability) => capability.id === selectedCapabilityId) ?? capabilities[0];
+    (0, import_react.useEffect)(() => {
+      if (!open || !initialCapabilityId) return;
+      if (selectedCapabilityId === initialCapabilityId) return;
+      if (capabilities.some((capability) => capability.id === initialCapabilityId)) {
+        setSelectedCapabilityId(initialCapabilityId);
+      }
+    }, [open, initialCapabilityId, capabilities, selectedCapabilityId]);
     const unified = selectedCapability?.unified;
     const selectedSpecific = selectedCapability?.specifics.find((specific) => specific.entry_id === selectedSpecificId) ?? selectedCapability?.specifics[0];
     const autoPolicy = effectiveAutoPolicy(data?.auto_settings, targetCwd, selectedCapability?.capability_id);
@@ -25246,8 +25253,8 @@
       setCapabilityMenuOpen(false);
       setTransferCapabilityId("");
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}`, "data-testid": "provider-config-sync-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "provider-config-sync-topbar", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}${embedded ? " embedded" : ""}`, "data-testid": "provider-config-sync-page", children: [
+      !embedded && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "provider-config-sync-topbar", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: "Provider Config Sync" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-subtitle", children: [
@@ -25278,296 +25285,298 @@
               children: "Settings"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-secondary", onClick: onClose, disabled: busy, children: "Close" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-secondary", onClick: onClose, disabled: busy, hidden: embedded, children: "Close" })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-shell", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "button",
-          {
-            type: "button",
-            className: "provider-config-sync-menu-scrim",
-            "aria-label": "Close capabilities menu",
-            onClick: () => setCapabilityMenuOpen(false)
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "provider-config-sync-sidebar", id: "provider-config-sync-capability-menu", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Scope" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-segmented", children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: item === scope ? "active" : "",
-                onClick: () => setScope(item),
-                children: item
-              },
-              item
-            )) })
-          ] }),
-          scope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Project" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-              "select",
-              {
-                "aria-label": "Provider Config Sync project",
-                value: selectedProjectPath,
-                onChange: (e) => {
-                  setSelectedProjectPath(e.target.value);
-                },
-                className: "provider-config-sync-select",
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "select project" }),
-                  projectOptions.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: project.path, children: [
-                    project.name,
-                    " \xB7 ",
-                    project.path
-                  ] }, `${project.node_id ?? "primary"}:${project.path}`))
-                ]
-              }
-            )
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-heading", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Capabilities" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        !embedded && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "provider-config-sync-menu-scrim",
+              "aria-label": "Close capabilities menu",
+              onClick: () => setCapabilityMenuOpen(false)
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "provider-config-sync-sidebar", id: "provider-config-sync-capability-menu", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Scope" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-segmented", children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "btn-secondary provider-config-sync-icon-action",
-                  "aria-label": "Add capability",
-                  title: "Add capability",
-                  disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
-                  onClick: () => {
-                    if (createOpen) {
-                      setCreateOpen(false);
-                      return;
-                    }
-                    openCreateCapability();
+                  className: item === scope ? "active" : "",
+                  onClick: () => setScope(item),
+                  children: item
+                },
+                item
+              )) })
+            ] }),
+            scope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Project" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                "select",
+                {
+                  "aria-label": "Provider Config Sync project",
+                  value: selectedProjectPath,
+                  onChange: (e) => {
+                    setSelectedProjectPath(e.target.value);
                   },
-                  children: "+"
+                  className: "provider-config-sync-select",
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "select project" }),
+                    projectOptions.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: project.path, children: [
+                      project.name,
+                      " \xB7 ",
+                      project.path
+                    ] }, `${project.node_id ?? "primary"}:${project.path}`))
+                  ]
                 }
               )
             ] }),
-            createOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-create-panel", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "select",
-                {
-                  "aria-label": "New capability category",
-                  className: "provider-config-sync-select",
-                  value: newCapabilityCategory,
-                  onChange: (e) => setNewCapabilityCategory(e.target.value),
-                  children: CREATE_CAPABILITY_CATEGORIES.map((category) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: category.id, children: category.label }, category.id))
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-provider-checks", "aria-label": "New capability providers", children: providerOptions.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-section", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-sidebar-heading", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-label", children: "Capabilities" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "btn-secondary provider-config-sync-icon-action",
+                    "aria-label": "Add capability",
+                    title: "Add capability",
+                    disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
+                    onClick: () => {
+                      if (createOpen) {
+                        setCreateOpen(false);
+                        return;
+                      }
+                      openCreateCapability();
+                    },
+                    children: "+"
+                  }
+                )
+              ] }),
+              createOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-create-panel", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "select",
+                  {
+                    "aria-label": "New capability category",
+                    className: "provider-config-sync-select",
+                    value: newCapabilityCategory,
+                    onChange: (e) => setNewCapabilityCategory(e.target.value),
+                    children: CREATE_CAPABILITY_CATEGORIES.map((category) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: category.id, children: category.label }, category.id))
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-provider-checks", "aria-label": "New capability providers", children: providerOptions.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "input",
+                    {
+                      type: "checkbox",
+                      checked: newCapabilityProviders.includes(provider.providerKind),
+                      onChange: (e) => setNewCapabilityProviders((current) => e.target.checked ? [...current, provider.providerKind] : current.filter((kind) => kind !== provider.providerKind))
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: provider.providerName })
+                ] }, provider.providerKind)) }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "input",
                   {
-                    type: "checkbox",
-                    checked: newCapabilityProviders.includes(provider.providerKind),
-                    onChange: (e) => setNewCapabilityProviders((current) => e.target.checked ? [...current, provider.providerKind] : current.filter((kind) => kind !== provider.providerKind))
+                    "aria-label": "New capability name",
+                    className: "provider-config-sync-input",
+                    value: newCapabilityName,
+                    onChange: (e) => setNewCapabilityName(e.target.value),
+                    placeholder: "name"
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: provider.providerName })
-              ] }, provider.providerKind)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "input",
-                {
-                  "aria-label": "New capability name",
-                  className: "provider-config-sync-input",
-                  value: newCapabilityName,
-                  onChange: (e) => setNewCapabilityName(e.target.value),
-                  placeholder: "name"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "input",
-                {
-                  "aria-label": "New capability description",
-                  className: "provider-config-sync-input",
-                  value: newCapabilityDescription,
-                  onChange: (e) => setNewCapabilityDescription(e.target.value),
-                  placeholder: "description"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "textarea",
-                {
-                  "aria-label": "New capability instructions",
-                  className: "provider-config-sync-textarea provider-config-sync-create-instructions",
-                  value: newCapabilityInstructions,
-                  onChange: (e) => setNewCapabilityInstructions(e.target.value),
-                  placeholder: "instructions"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "btn-primary",
-                  disabled: busy || !newCapabilityName.trim() || newCapabilityProviders.length === 0,
-                  onClick: () => void createCapability(),
-                  children: "Add capability"
-                }
-              )
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-token-summary", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.allTracked) }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "estimated tracked config" })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "input",
+                  {
+                    "aria-label": "New capability description",
+                    className: "provider-config-sync-input",
+                    value: newCapabilityDescription,
+                    onChange: (e) => setNewCapabilityDescription(e.target.value),
+                    placeholder: "description"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "textarea",
+                  {
+                    "aria-label": "New capability instructions",
+                    className: "provider-config-sync-textarea provider-config-sync-create-instructions",
+                    value: newCapabilityInstructions,
+                    onChange: (e) => setNewCapabilityInstructions(e.target.value),
+                    placeholder: "instructions"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "btn-primary",
+                    disabled: busy || !newCapabilityName.trim() || newCapabilityProviders.length === 0,
+                    onClick: () => void createCapability(),
+                    children: "Add capability"
+                  }
+                )
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Unified" }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.unified) })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-token-summary", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.allTracked) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "estimated tracked config" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Unified" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.unified) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Providers" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.specifics) })
+                ] }),
+                scopeTokenTotals.byProvider.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.providerName }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(item.tokenCount) })
+                ] }, item.providerKind))
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Providers" }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(scopeTokenTotals.specifics) })
-              ] }),
-              scopeTokenTotals.byProvider.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.providerName }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(item.tokenCount) })
-              ] }, item.providerKind))
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-file-list", children: [
-              capabilityGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                "section",
-                {
-                  className: `provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
-                  children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-group-header", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                        "button",
-                        {
-                          type: "button",
-                          className: "provider-config-sync-capability-group-title",
-                          "aria-expanded": !collapsedGroups[group.category],
-                          onClick: () => setCollapsedGroups((current) => ({
-                            ...current,
-                            [group.category]: !current[group.category]
-                          })),
-                          children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
-                          ]
-                        }
-                      ),
-                      CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                        "button",
-                        {
-                          type: "button",
-                          className: "btn-secondary provider-config-sync-icon-action provider-config-sync-capability-group-add",
-                          "aria-label": `Add ${group.label} capability`,
-                          title: `Add ${group.label} capability`,
-                          disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
-                          onClick: () => openCreateCapability(group.category),
-                          children: "+"
-                        }
-                      )
-                    ] }),
-                    !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-item", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                        "button",
-                        {
-                          type: "button",
-                          className: capability.id === selectedCapability?.id ? "active" : "",
-                          onClick: () => selectCapability(capability.id),
-                          onContextMenu: (e) => {
-                            e.preventDefault();
-                            selectCapability(capability.id);
-                            if (canTransferCapability(capability)) {
-                              setTransferCapabilityId((current) => current === capability.id ? "" : capability.id);
-                              setTransferTargetScope(capability.scope === "global" ? "project" : "global");
-                            }
-                          },
-                          children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "provider-config-sync-capability-name", children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                                "span",
-                                {
-                                  className: `provider-config-sync-status-dot ${capabilityStatus(capability)}`,
-                                  "aria-label": `${capabilityStatus(capability)} capability`
-                                }
-                              ),
-                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: capability.name })
-                            ] }),
-                            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-                              capability.specific_count,
-                              " specifics",
-                              capability.has_diffs ? " \xB7 diff" : " \xB7 aligned",
-                              capability.missing_count ? ` \xB7 ${capability.missing_count} missing` : "",
-                              ` \xB7 ${formatTokens(capability.total_token_count)} est.`
-                            ] })
-                          ]
-                        }
-                      ),
-                      transferCapabilityId === capability.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-transfer-panel", children: canTransferCapability(capability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-segmented", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-file-list", children: [
+                capabilityGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                  "section",
+                  {
+                    className: `provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-group-header", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                          "button",
+                          {
+                            type: "button",
+                            className: "provider-config-sync-capability-group-title",
+                            "aria-expanded": !collapsedGroups[group.category],
+                            onClick: () => setCollapsedGroups((current) => ({
+                              ...current,
+                              [group.category]: !current[group.category]
+                            })),
+                            children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
+                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
+                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
+                            ]
+                          }
+                        ),
+                        CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                          "button",
+                          {
+                            type: "button",
+                            className: "btn-secondary provider-config-sync-icon-action provider-config-sync-capability-group-add",
+                            "aria-label": `Add ${group.label} capability`,
+                            title: `Add ${group.label} capability`,
+                            disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
+                            onClick: () => openCreateCapability(group.category),
+                            children: "+"
+                          }
+                        )
+                      ] }),
+                      !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-item", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                          "button",
+                          {
+                            type: "button",
+                            className: capability.id === selectedCapability?.id ? "active" : "",
+                            onClick: () => selectCapability(capability.id),
+                            onContextMenu: (e) => {
+                              e.preventDefault();
+                              selectCapability(capability.id);
+                              if (canTransferCapability(capability)) {
+                                setTransferCapabilityId((current) => current === capability.id ? "" : capability.id);
+                                setTransferTargetScope(capability.scope === "global" ? "project" : "global");
+                              }
+                            },
+                            children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "provider-config-sync-capability-name", children: [
+                                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                                  "span",
+                                  {
+                                    className: `provider-config-sync-status-dot ${capabilityStatus(capability)}`,
+                                    "aria-label": `${capabilityStatus(capability)} capability`
+                                  }
+                                ),
+                                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: capability.name })
+                              ] }),
+                              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+                                capability.specific_count,
+                                " specifics",
+                                capability.has_diffs ? " \xB7 diff" : " \xB7 aligned",
+                                capability.missing_count ? ` \xB7 ${capability.missing_count} missing` : "",
+                                ` \xB7 ${formatTokens(capability.total_token_count)} est.`
+                              ] })
+                            ]
+                          }
+                        ),
+                        transferCapabilityId === capability.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-transfer-panel", children: canTransferCapability(capability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-segmented", children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                              "button",
+                              {
+                                type: "button",
+                                className: transferMode === "copy" ? "active" : "",
+                                onClick: () => setTransferMode("copy"),
+                                children: "Copy"
+                              }
+                            ),
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                              "button",
+                              {
+                                type: "button",
+                                className: transferMode === "move" ? "active" : "",
+                                onClick: () => setTransferMode("move"),
+                                children: "Move"
+                              }
+                            )
+                          ] }),
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                            "button",
+                            "select",
                             {
-                              type: "button",
-                              className: transferMode === "copy" ? "active" : "",
-                              onClick: () => setTransferMode("copy"),
-                              children: "Copy"
+                              "aria-label": "Transfer target level",
+                              className: "provider-config-sync-select",
+                              value: transferTargetScope,
+                              onChange: (e) => setTransferTargetScope(e.target.value),
+                              children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: item, children: item }, item))
+                            }
+                          ),
+                          transferTargetScope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                            "select",
+                            {
+                              "aria-label": "Transfer target project",
+                              className: "provider-config-sync-select",
+                              value: transferTargetCwd,
+                              onChange: (e) => setTransferTargetCwd(e.target.value),
+                              children: [
+                                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "select project" }),
+                                projectOptions.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: project.path, children: [
+                                  project.name,
+                                  " \xB7 ",
+                                  project.path
+                                ] }, `${project.node_id ?? "primary"}:${project.path}`))
+                              ]
                             }
                           ),
                           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                             "button",
                             {
                               type: "button",
-                              className: transferMode === "move" ? "active" : "",
-                              onClick: () => setTransferMode("move"),
-                              children: "Move"
+                              className: "btn-primary",
+                              disabled: busy || transferTargetScope === "project" && !transferTargetCwd || capability.scope === transferTargetScope && targetCwd === transferTargetEffectiveCwd,
+                              onClick: () => void transferCapability(capability),
+                              children: transferMode === "copy" ? "Copy capability" : "Move capability"
                             }
                           )
-                        ] }),
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                          "select",
-                          {
-                            "aria-label": "Transfer target level",
-                            className: "provider-config-sync-select",
-                            value: transferTargetScope,
-                            onChange: (e) => setTransferTargetScope(e.target.value),
-                            children: SCOPES.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: item, children: item }, item))
-                          }
-                        ),
-                        transferTargetScope === "project" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                          "select",
-                          {
-                            "aria-label": "Transfer target project",
-                            className: "provider-config-sync-select",
-                            value: transferTargetCwd,
-                            onChange: (e) => setTransferTargetCwd(e.target.value),
-                            children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "select project" }),
-                              projectOptions.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: project.path, children: [
-                                project.name,
-                                " \xB7 ",
-                                project.path
-                              ] }, `${project.node_id ?? "primary"}:${project.path}`))
-                            ]
-                          }
-                        ),
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                          "button",
-                          {
-                            type: "button",
-                            className: "btn-primary",
-                            disabled: busy || transferTargetScope === "project" && !transferTargetCwd || capability.scope === transferTargetScope && targetCwd === transferTargetEffectiveCwd,
-                            onClick: () => void transferCapability(capability),
-                            children: transferMode === "copy" ? "Copy capability" : "Move capability"
-                          }
-                        )
-                      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "Move/copy supports skills, subagents, and commands." }) })
-                    ] }, capability.id)) })
-                  ]
-                },
-                group.category
-              )),
-              capabilities.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: scope === "project" && !targetCwd ? "Select a project." : "No equivalent capabilities found." })
+                        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "Move/copy supports skills, subagents, and commands." }) })
+                      ] }, capability.id)) })
+                    ]
+                  },
+                  group.category
+                )),
+                capabilities.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: scope === "project" && !targetCwd ? "Select a project." : "No equivalent capabilities found." })
+              ] })
             ] })
           ] })
         ] }),
@@ -26170,9 +26179,12 @@
     editable,
     leftLabel,
     rightLabel,
-    onNextDiff
+    onNextDiff,
+    selectedRows,
+    onClearSelectedRows
   }) {
     const changedCount = counts.added + counts.removed + counts.changed;
+    const selectedCount = selectedRows.length;
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-block-controls", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: changedCount === 0 ? "Aligned" : diffCountsLabel(counts) }),
       editable && changedCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
@@ -26200,7 +26212,44 @@
             label: `Apply block to ${rightLabel}`,
             onClick: editable.onApplyRightBlock
           }
-        )
+        ),
+        selectedCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-selected-row-actions", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+            selectedCount,
+            " rows"
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            ArrowApplyButton,
+            {
+              direction: "left",
+              label: `Apply ${selectedCount} selected rows to ${leftLabel}`,
+              onClick: () => {
+                editable.onApplyLeftRows(selectedRows);
+                onClearSelectedRows();
+              }
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            ArrowApplyButton,
+            {
+              direction: "right",
+              label: `Apply ${selectedCount} selected rows to ${rightLabel}`,
+              onClick: () => {
+                editable.onApplyRightRows(selectedRows);
+                onClearSelectedRows();
+              }
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "btn-secondary provider-config-sync-clear-selected-rows-button",
+              onClick: onClearSelectedRows,
+              children: "Clear"
+            }
+          )
+        ] })
       ] })
     ] });
   }
@@ -26257,11 +26306,17 @@
     const nextDiffIndex = (0, import_react.useRef)(0);
     const [highlightedDiffKey, setHighlightedDiffKey] = (0, import_react.useState)(null);
     const [activeEditorKey, setActiveEditorKey] = (0, import_react.useState)(null);
+    const [selectedRowKeys, setSelectedRowKeys] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
+    const selectedRows = (0, import_react.useMemo)(
+      () => rows.filter((row) => row.kind !== "same" && selectedRowKeys.has(row.key)),
+      [rows, selectedRowKeys]
+    );
     (0, import_react.useEffect)(() => {
       nextDiffIndex.current = 0;
       diffRowNodes.current.clear();
       setHighlightedDiffKey(null);
       setActiveEditorKey(null);
+      setSelectedRowKeys(/* @__PURE__ */ new Set());
     }, [unifiedContent, specificContent]);
     const registerDiffRow = (0, import_react.useCallback)((key, node) => {
       if (node) {
@@ -26281,6 +26336,20 @@
     }, [diffRowKeys]);
     const deactivateEditor = (0, import_react.useCallback)((key) => {
       setActiveEditorKey((current) => current === key ? null : current);
+    }, []);
+    const toggleSelectedRow = (0, import_react.useCallback)((key) => {
+      setSelectedRowKeys((current) => {
+        const next = new Set(current);
+        if (next.has(key)) {
+          next.delete(key);
+          return next;
+        }
+        next.add(key);
+        return next;
+      });
+    }, []);
+    const clearSelectedRows = (0, import_react.useCallback)(() => {
+      setSelectedRowKeys(/* @__PURE__ */ new Set());
     }, []);
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `${className ? `${className} ` : ""}provider-config-sync-aligned-diff`, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-aligned-diff-header", children: [
@@ -26303,7 +26372,9 @@
             editable,
             leftLabel,
             rightLabel,
-            onNextDiff: goToNextDiff
+            onNextDiff: goToNextDiff,
+            selectedRows,
+            onClearSelectedRows: clearSelectedRows
           }
         ),
         editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -26323,10 +26394,11 @@
         const hunk = hunkByFirstRow.get(row.key);
         const changed = row.kind !== "same";
         const renderKey = editable ? editableDiffRowKey(row, index) : row.key;
+        const selected = selectedRowKeys.has(row.key);
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           "div",
           {
-            className: `provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}`,
+            className: `provider-config-sync-aligned-diff-row-wrap${highlightedDiffKey === row.key ? " highlighted" : ""}${selected ? " selected" : ""}`,
             ref: (node) => {
               if (changed) registerDiffRow(row.key, node);
             },
@@ -26368,23 +26440,17 @@
                     onChange: editable.onChangeLeft
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: diffCellClassName(row, "left"), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: row.unifiedText }) }),
-                editable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-aligned-diff-line-controls", children: row.kind !== "same" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+                editable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-aligned-diff-line-controls", children: row.kind !== "same" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "provider-config-sync-select-row-control", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    ArrowApplyButton,
+                    "input",
                     {
-                      direction: "left",
-                      label: `Apply line to ${leftLabel}`,
-                      onClick: () => editable.onApplyLeftRows([row])
+                      type: "checkbox",
+                      checked: selected,
+                      "aria-label": `Select diff entry ${index + 1} for selected rows apply`,
+                      onChange: () => toggleSelectedRow(row.key)
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    ArrowApplyButton,
-                    {
-                      direction: "right",
-                      label: `Apply line to ${rightLabel}`,
-                      onClick: () => editable.onApplyRightRows([row])
-                    }
-                  )
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Select" })
                 ] }) }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-line-number", children: row.specificLine ?? "" }),
                 editable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
