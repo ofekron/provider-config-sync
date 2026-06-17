@@ -7,22 +7,14 @@ from pathlib import Path
 
 import yaml
 
+from provider_config_sync_backend.prompt_templates import render_prompt
+
 _CLAUDE_COMMAND = {
     "description": "Sync Claude, Codex, and Gemini provider config capabilities",
     "allowed-tools": "mcp__provider_config_sync__list_provider_config_capabilities, mcp__provider_config_sync__read_provider_config_entry, mcp__provider_config_sync__write_provider_config_entry, mcp__provider_config_sync__apply_provider_config_entry, mcp__provider_config_sync__upsert_unified_capability_item, mcp__provider_config_sync__remove_unified_capability_item",
 }
 
-_SYNC_PROMPT = """Use Provider Config Sync for this provider capability change.
-
-Workflow:
-1. List provider config capabilities for the current project.
-2. Find or create the matching unified capability.
-3. Apply the unified capability to every configured provider that has an equivalent native config.
-4. If a provider-specific config already has the better version, pull it into the unified capability first, then apply it outward.
-5. Preserve provider-specific extensions instead of flattening them away.
-
-Never edit only one provider-native config when the capability has equivalents in Claude, Codex, or Gemini.
-"""
+_SYNC_PROMPT = render_prompt("sync_prompt.md")
 
 
 def _expand(path: str) -> Path:
