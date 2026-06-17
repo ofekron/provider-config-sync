@@ -685,6 +685,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
 
   return (
     <div className={`provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}${embedded ? " embedded" : ""}`} data-testid="provider-config-sync-page">
+      {!embedded && (
       <header className="provider-config-sync-topbar">
         <div>
           <h1>Provider Config Sync</h1>
@@ -717,8 +718,11 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
           </button>
         </div>
       </header>
+      )}
 
       <div className="provider-config-sync-shell">
+        {!embedded && (
+        <>
         <button
           type="button"
           className="provider-config-sync-menu-scrim"
@@ -1003,6 +1007,8 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
             </div>
           </div>
         </aside>
+        </>
+        )}
 
         <main className="provider-config-sync-main">
           {error && <div className="provider-config-sync-error">{error}</div>}

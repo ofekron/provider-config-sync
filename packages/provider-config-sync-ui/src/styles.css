@@ -76,6 +76,12 @@
   min-height: 0;
 }
 
+/* Focused embed: topbar + sidebar are unmounted, so the editor pane
+ * owns the whole width instead of sharing a two-column grid. */
+.provider-config-sync-page.embedded .provider-config-sync-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .provider-config-sync-topbar {
   flex: 0 0 auto;
   display: flex;
