@@ -459,7 +459,7 @@ def _skill_roots_for_provider(
     kind = provider["kind"]
     if scope == "global":
         if kind == "claude":
-            return [("", _provider_config_dir(provider) / "skills")]
+            return [("", _agents_skills_dir()), ("", _provider_config_dir(provider) / "skills")]
         if kind == "gemini":
             return [("", _agents_skills_dir()), ("", _provider_config_dir(provider) / "skills")]
         if kind == "codex":
