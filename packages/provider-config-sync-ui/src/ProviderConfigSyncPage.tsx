@@ -1091,7 +1091,11 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                       {selectedSpecific.read_error ? (
                         <div className="provider-config-sync-empty">{selectedSpecific.read_error}</div>
                       ) : !selectedSpecific.exists ? (
-                        <StructuredMissingSpecific specific={selectedSpecific} />
+                        <MissingSpecificColumns
+                          unified={unified}
+                          specific={selectedSpecific}
+                          unifiedContent={debouncedDraftFor(unified)}
+                        />
                       ) : isStructuredCapability(selectedCapability) ? (
                         <StructuredSpecificView
                           busy={busy}
@@ -1985,6 +1989,44 @@ function StructuredMissingSpecific({ specific }: { specific: ProviderConfigSyncF
     <div className="provider-config-sync-empty">
       <div>Not configured yet.</div>
       <small>Apply unified to create {specific.label}.</small>
+    </div>
+  );
+}
+
+function MissingSpecificColumns({
+  unified,
+  specific,
+  unifiedContent,
+}: {
+  unified: ProviderConfigSyncFile;
+  specific: ProviderConfigSyncFile;
+  unifiedContent: string;
+}) {
+  return (
+    <div className="provider-config-sync-editor-grid provider-config-sync-missing-columns">
+      <div className="provider-config-sync-editor-card">
+        <div className="provider-config-sync-card-header">
+          <span>Unified</span>
+          <small>{unified.exists ? `${formatTokens(unified.token_count)} est.` : "not configured"}</small>
+        </div>
+        <div className="provider-config-sync-specific-content provider-config-sync-readonly-pane">
+          {unified.exists ? (
+            <pre>{unifiedContent || ""}</pre>
+          ) : (
+            <div className="provider-config-sync-empty">Unified not configured yet.</div>
+          )}
+        </div>
+      </div>
+      <div className="provider-config-sync-editor-card">
+        <div className="provider-config-sync-card-header">
+          <span>{specific.label}</span>
+          <small>not on disk</small>
+        </div>
+        <div className="provider-config-sync-empty">
+          <div>{specific.label} not configured yet.</div>
+          <small>Apply unified to create this file from the unified source.</small>
+        </div>
+      </div>
     </div>
   );
 }

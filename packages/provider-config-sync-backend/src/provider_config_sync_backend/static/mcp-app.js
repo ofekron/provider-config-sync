@@ -25649,7 +25649,14 @@
                   ] }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: selectedSpecific.path })
                 ] }),
-                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific: selectedSpecific }) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  MissingSpecificColumns,
+                  {
+                    unified,
+                    specific: selectedSpecific,
+                    unifiedContent: debouncedDraftFor(unified)
+                  }
+                ) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   StructuredSpecificView,
                   {
                     busy,
@@ -26412,6 +26419,34 @@
         "Apply unified to create ",
         specific.label,
         "."
+      ] })
+    ] });
+  }
+  function MissingSpecificColumns({
+    unified,
+    specific,
+    unifiedContent
+  }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-editor-grid provider-config-sync-missing-columns", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-editor-card", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-card-header", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Unified" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: unified.exists ? `${formatTokens(unified.token_count)} est.` : "not configured" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-specific-content provider-config-sync-readonly-pane", children: unified.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: unifiedContent || "" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: "Unified not configured yet." }) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-editor-card", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-card-header", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: specific.label }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "not on disk" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-empty", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+            specific.label,
+            " not configured yet."
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "Apply unified to create this file from the unified source." })
+        ] })
       ] })
     ] });
   }
