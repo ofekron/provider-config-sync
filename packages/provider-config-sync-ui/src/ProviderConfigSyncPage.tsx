@@ -41,6 +41,13 @@ export interface ProviderConfigSyncPageProps {
   onClose: () => void;
   client: ProviderConfigSyncApiClient;
   subscribeExternalChanges?: (cb: () => void) => () => void;
+  /** Pre-select this capability once data loads. Used when the page is
+   *  embedded inline (agent `open_config_panel` tool) so it opens focused
+   *  on the relevant capability without a user click. */
+  initialCapabilityId?: string;
+  /** Embedded (inline/panel) mode: the host provides chrome + close, so
+   *  hide the page's own topbar Close button and constrain height. */
+  embedded?: boolean;
 }
 
 const SCOPES: ProviderConfigSyncScope[] = ["global", "project"];
@@ -180,7 +187,7 @@ function canTransferCapability(capability: ProviderConfigSyncCapability): boolea
   return capability.category === "skill" || capability.category === "agent" || capability.category === "command";
 }
 
-export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges }: ProviderConfigSyncPageProps) {
+export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeExternalChanges, initialCapabilityId, embedded }: ProviderConfigSyncPageProps) {
   const [data, setData] = useState<ProviderConfigSyncResponse | null>(null);
   const [projects, setProjects] = useState<ProviderConfigSyncProject[]>([]);
   const [scope, setScope] = useState<ProviderConfigSyncScope>("project");
@@ -307,6 +314,16 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
     [data?.providers],
   );
   const selectedCapability = capabilities.find((capability) => capability.id === selectedCapabilityId) ?? capabilities[0];
+
+  // Honor an embedded pre-selection: once data loads, jump to the
+  // requested capability (no-op if it doesn't exist in this scope/cwd).
+  useEffect(() => {
+    if (!open || !initialCapabilityId) return;
+    if (selectedCapabilityId === initialCapabilityId) return;
+    if (capabilities.some((capability) => capability.id === initialCapabilityId)) {
+      setSelectedCapabilityId(initialCapabilityId);
+    }
+  }, [open, initialCapabilityId, capabilities, selectedCapabilityId]);
   const unified = selectedCapability?.unified;
   const selectedSpecific =
     selectedCapability?.specifics.find((specific) => specific.entry_id === selectedSpecificId)
@@ -667,7 +684,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
   };
 
   return (
-    <div className={`provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}`} data-testid="provider-config-sync-page">
+    <div className={`provider-config-sync-page${capabilityMenuOpen ? " menu-open" : ""}${embedded ? " embedded" : ""}`} data-testid="provider-config-sync-page">
       <header className="provider-config-sync-topbar">
         <div>
           <h1>Provider Config Sync</h1>
@@ -695,7 +712,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
           >
             Settings
           </button>
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={busy}>
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={busy} hidden={embedded}>
             Close
           </button>
         </div>
