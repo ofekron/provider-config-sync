@@ -68,6 +68,7 @@ const CREATE_CAPABILITY_CATEGORIES = [
   { id: "agent", label: "Subagent" },
   { id: "command", label: "Command" },
 ] as const;
+type CreateCapabilityCategory = (typeof CREATE_CAPABILITY_CATEGORIES)[number]["id"];
 const COMMON_ITEM_FIELDS: Array<{ field: keyof CommonItemDraft; label: string }> = [
   { field: "name", label: "Name" },
   { field: "description", label: "Description" },
@@ -191,8 +192,8 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
   const [transferTargetScope, setTransferTargetScope] = useState<ProviderConfigSyncScope>("project");
   const [transferTargetCwd, setTransferTargetCwd] = useState(cwd ?? "");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [newCapabilityCategory, setNewCapabilityCategory] = useState<"skill" | "agent" | "command">("skill");
-  const [newCapabilityProviders, setNewCapabilityProviders] = useState<string[]>([]);
+  const [newCapabilityCategory, setNewCapabilityCategory] = useState<CreateCapabilityCategory>("skill");
+  const [newCapabilityProviderKeys, setNewCapabilityProviderKeys] = useState<string[]>([]);
   const [newCapabilityName, setNewCapabilityName] = useState("");
   const [newCapabilityDescription, setNewCapabilityDescription] = useState("");
   const [newCapabilityInstructions, setNewCapabilityInstructions] = useState("");
@@ -284,9 +285,9 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
       unified += capability.unified_token_count ?? 0;
       specifics += capability.specific_token_count ?? 0;
       for (const item of capability.provider_token_counts ?? []) {
-        const current = byProvider.get(item.provider_kind) ?? { providerName: item.provider_name, tokenCount: 0 };
+        const current = byProvider.get(item.provider_key) ?? { providerName: item.provider_name, tokenCount: 0 };
         current.tokenCount += item.token_count;
-        byProvider.set(item.provider_kind, current);
+        byProvider.set(item.provider_key, current);
       }
     }
     return {
@@ -294,12 +295,13 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
       specifics,
       allTracked: unified + specifics,
       byProvider: [...byProvider.entries()]
-        .map(([providerKind, item]) => ({ providerKind, ...item }))
+        .map(([providerKey, item]) => ({ providerKey, ...item }))
         .sort((a, b) => a.providerName.localeCompare(b.providerName)),
     };
   }, [capabilities]);
   const providerOptions = useMemo(
     () => (data?.providers ?? []).map((provider) => ({
+      providerKey: provider.key,
       providerKind: provider.kind,
       providerName: provider.name,
     })),
@@ -344,10 +346,10 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
   }, [scope, targetCwd]);
 
   useEffect(() => {
-    setNewCapabilityProviders((current) => {
-      const available = new Set(providerOptions.map((provider) => provider.providerKind));
-      const kept = current.filter((kind) => available.has(kind));
-      return kept.length > 0 ? kept : providerOptions.map((provider) => provider.providerKind);
+    setNewCapabilityProviderKeys((current) => {
+      const available = new Set(providerOptions.map((provider) => provider.providerKey));
+      const kept = current.filter((key) => available.has(key));
+      return kept.length > 0 ? kept : providerOptions.map((provider) => provider.providerKey);
     });
   }, [providerOptions]);
 
@@ -456,14 +458,14 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
 
   const createCapability = useCallback(async () => {
     const name = newCapabilityName.trim();
-    if (!name || newCapabilityProviders.length === 0) return;
+    if (!name || newCapabilityProviderKeys.length === 0) return;
     setBusy(true);
     try {
       const body: ProviderConfigSyncCreateCapabilityRequest = {
         cwd: targetCwd,
         scope,
         category: newCapabilityCategory,
-        provider_kinds: newCapabilityProviders,
+        provider_keys: newCapabilityProviderKeys,
         name,
         description: newCapabilityDescription.trim(),
         instructions: newCapabilityInstructions,
@@ -486,12 +488,18 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
     targetCwd,
     scope,
     newCapabilityCategory,
-    newCapabilityProviders,
+    newCapabilityProviderKeys,
     newCapabilityName,
     newCapabilityDescription,
     newCapabilityInstructions,
     fetchSync,
   ]);
+
+  const openCreateCapability = useCallback((category: CreateCapabilityCategory = "skill") => {
+    setNewCapabilityCategory(category);
+    setNewCapabilityProviderKeys(providerOptions.map((provider) => provider.providerKey));
+    setCreateOpen(true);
+  }, [providerOptions]);
 
   const transferCapability = useCallback(async (capability: ProviderConfigSyncCapability) => {
     if (!canTransferCapability(capability) || !transferTargetScope) return;
@@ -749,8 +757,11 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                 title="Add capability"
                 disabled={busy || providerOptions.length === 0 || (scope === "project" && !targetCwd)}
                 onClick={() => {
-                  setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
-                  setCreateOpen((current) => !current);
+                  if (createOpen) {
+                    setCreateOpen(false);
+                    return;
+                  }
+                  openCreateCapability();
                 }}
               >
                 +
@@ -762,7 +773,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                   aria-label="New capability category"
                   className="provider-config-sync-select"
                   value={newCapabilityCategory}
-                  onChange={(e) => setNewCapabilityCategory(e.target.value as "skill" | "agent" | "command")}
+                  onChange={(e) => setNewCapabilityCategory(e.target.value as CreateCapabilityCategory)}
                 >
                   {CREATE_CAPABILITY_CATEGORIES.map((category) => (
                     <option key={category.id} value={category.id}>{category.label}</option>
@@ -770,14 +781,14 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                 </select>
                 <div className="provider-config-sync-provider-checks" aria-label="New capability providers">
                   {providerOptions.map((provider) => (
-                    <label key={provider.providerKind}>
+                    <label key={provider.providerKey}>
                       <input
                         type="checkbox"
-                        checked={newCapabilityProviders.includes(provider.providerKind)}
-                        onChange={(e) => setNewCapabilityProviders((current) => (
+                        checked={newCapabilityProviderKeys.includes(provider.providerKey)}
+                        onChange={(e) => setNewCapabilityProviderKeys((current) => (
                           e.target.checked
-                            ? [...current, provider.providerKind]
-                            : current.filter((kind) => kind !== provider.providerKind)
+                            ? [...current, provider.providerKey]
+                            : current.filter((key) => key !== provider.providerKey)
                         ))}
                       />
                       <span>{provider.providerName}</span>
@@ -808,7 +819,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                 <button
                   type="button"
                   className="btn-primary"
-                  disabled={busy || !newCapabilityName.trim() || newCapabilityProviders.length === 0}
+                  disabled={busy || !newCapabilityName.trim() || newCapabilityProviderKeys.length === 0}
                   onClick={() => void createCapability()}
                 >
                   Add capability
@@ -829,7 +840,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                 <strong>{formatTokens(scopeTokenTotals.specifics)}</strong>
               </div>
               {scopeTokenTotals.byProvider.map((item) => (
-                <div key={item.providerKind}>
+                <div key={item.providerKey}>
                   <span>{item.providerName}</span>
                   <strong>{formatTokens(item.tokenCount)}</strong>
                 </div>
@@ -841,19 +852,33 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                   className={`provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`}
                   key={group.category}
                 >
-                  <button
-                    type="button"
-                    className="provider-config-sync-capability-group-title"
-                    aria-expanded={!collapsedGroups[group.category]}
-                    onClick={() => setCollapsedGroups((current) => ({
-                      ...current,
-                      [group.category]: !current[group.category],
-                    }))}
-                  >
-                    <span className="provider-config-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
-                    <span>{group.label}</span>
-                    <small>{group.capabilities.length}</small>
-                  </button>
+                  <div className="provider-config-sync-capability-group-header">
+                    <button
+                      type="button"
+                      className="provider-config-sync-capability-group-title"
+                      aria-expanded={!collapsedGroups[group.category]}
+                      onClick={() => setCollapsedGroups((current) => ({
+                        ...current,
+                        [group.category]: !current[group.category],
+                      }))}
+                    >
+                      <span className="provider-config-sync-capability-group-chevron">{collapsedGroups[group.category] ? ">" : "v"}</span>
+                      <span>{group.label}</span>
+                      <small>{group.capabilities.length}</small>
+                    </button>
+                    {CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && (
+                      <button
+                        type="button"
+                        className="btn-secondary provider-config-sync-icon-action provider-config-sync-capability-group-add"
+                        aria-label={`Add ${group.label} capability`}
+                        title={`Add ${group.label} capability`}
+                        disabled={busy || providerOptions.length === 0 || (scope === "project" && !targetCwd)}
+                        onClick={() => openCreateCapability(group.category as CreateCapabilityCategory)}
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
                   {!collapsedGroups[group.category] && (
                     <div className="provider-config-sync-capability-group-items">
                       {group.capabilities.map((capability) => (
@@ -1067,7 +1092,12 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                       {selectedSpecific.read_error ? (
                         <div className="provider-config-sync-empty">{selectedSpecific.read_error}</div>
                       ) : !selectedSpecific.exists ? (
-                        <StructuredMissingSpecific specific={selectedSpecific} />
+                        <StructuredMissingSpecific
+                          specific={selectedSpecific}
+                          busy={busy}
+                          writable={!!selectedSpecific.writable && !selectedSpecific.disabled && !!unified?.exists}
+                          onApply={() => void apply(selectedCapability, unified, selectedSpecific)}
+                        />
                       ) : isStructuredCapability(selectedCapability) ? (
                         <StructuredSpecificView
                           busy={busy}
@@ -1081,6 +1111,7 @@ export function ProviderConfigSyncPage({ open, cwd, onClose, client, subscribeEx
                           onSpecificContentChange={(content) => updateDraft(selectedSpecific, content)}
                           onSaveUnified={() => void saveFile(unified)}
                           onSaveSpecific={() => void saveFile(selectedSpecific)}
+                          onApply={() => void apply(selectedCapability, unified, selectedSpecific)}
                         />
                       ) : (
                         <EditableAlignedFileDiff
@@ -1202,6 +1233,7 @@ function StructuredSpecificView({
   onSpecificContentChange,
   onSaveUnified,
   onSaveSpecific,
+  onApply,
 }: {
   busy: boolean;
   capability: ProviderConfigSyncCapability;
@@ -1214,8 +1246,18 @@ function StructuredSpecificView({
   onSpecificContentChange: (content: string) => void;
   onSaveUnified: () => void;
   onSaveSpecific: () => void;
+  onApply: () => void;
 }) {
-  if (!specific.exists) return <StructuredMissingSpecific specific={specific} />;
+  if (!specific.exists) {
+    return (
+      <StructuredMissingSpecific
+        specific={specific}
+        busy={busy}
+        writable={!!specific.writable && !specific.disabled && !!unified.exists}
+        onApply={onApply}
+      />
+    );
+  }
   if (capability.capability_id === "mcp") {
     const unifiedServers = parseMcpServers(unifiedContent);
     const specificServers = parseMcpServers(specific.content);
@@ -1956,11 +1998,26 @@ function AlignedDiffView({
   );
 }
 
-function StructuredMissingSpecific({ specific }: { specific: ProviderConfigSyncFile }) {
+function StructuredMissingSpecific({
+  specific,
+  busy,
+  writable,
+  onApply,
+}: {
+  specific: ProviderConfigSyncFile;
+  busy: boolean;
+  writable: boolean;
+  onApply: () => void;
+}) {
   return (
     <div className="provider-config-sync-empty">
       <div>Not configured yet.</div>
       <small>Apply unified to create {specific.label}.</small>
+      {writable && (
+        <button type="button" className="btn-primary" disabled={busy} onClick={onApply}>
+          Apply unified
+        </button>
+      )}
     </div>
   );
 }

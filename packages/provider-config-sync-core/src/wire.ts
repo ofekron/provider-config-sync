@@ -27,9 +27,11 @@ export interface ProviderConfigSyncFile {
   disabled: boolean;
   provider_names: string[];
   provider_kinds: string[];
+  provider_keys: string[];
 }
 
 export interface ProviderConfigSyncProviderTokenCount {
+  provider_key: string;
   provider_kind: string;
   provider_name: string;
   token_count: number;
@@ -63,7 +65,7 @@ export interface ProviderConfigSyncCapability {
 export interface ProviderConfigSyncResponse {
   files: ProviderConfigSyncFile[];
   capabilities: ProviderConfigSyncCapability[];
-  providers: { kind: string; name: string }[];
+  providers: { key: string; kind: string; name: string }[];
   token_totals: ProviderConfigSyncTokenTotals;
   groups: Record<ProviderConfigSyncScope, ProviderConfigSyncCapability[]>;
   auto_settings?: ProviderConfigSyncAutoSettings;
@@ -95,7 +97,7 @@ export interface ProviderConfigSyncCreateCapabilityRequest {
   cwd: string;
   scope: ProviderConfigSyncScope;
   category: "skill" | "agent" | "command";
-  provider_kinds: string[];
+  provider_keys: string[];
   name: string;
   description: string;
   instructions: string;

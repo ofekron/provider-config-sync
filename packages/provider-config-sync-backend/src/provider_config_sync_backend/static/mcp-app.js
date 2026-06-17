@@ -24599,6 +24599,12 @@
     }
     return lineCount;
   }
+  function insertionIndexFromRowKey(row, target) {
+    const match = /^(added|removed):(\d+):(\d+)$/.exec(row.key);
+    if (!match)
+      return null;
+    return Number(match[target === "unified" ? 2 : 3]);
+  }
   function applyRowsToContent(content, rows, target) {
     const lines = splitLines(content);
     let offset = 0;
@@ -24611,7 +24617,8 @@
         return;
       }
       if (targetLine === null && sourceLine !== null) {
-        const index = insertionIndexFor(rows, rowIndex, target, lines.length) + offset;
+        const baseIndex = insertionIndexFromRowKey(row, target) ?? insertionIndexFor(rows, rowIndex, target, lines.length);
+        const index = baseIndex + offset;
         lines.splice(Math.min(Math.max(index, 0), lines.length), 0, sourceText);
         offset += 1;
         return;
@@ -24816,7 +24823,7 @@
     const [transferTargetCwd, setTransferTargetCwd] = (0, import_react.useState)(cwd ?? "");
     const [collapsedGroups, setCollapsedGroups] = (0, import_react.useState)({});
     const [newCapabilityCategory, setNewCapabilityCategory] = (0, import_react.useState)("skill");
-    const [newCapabilityProviders, setNewCapabilityProviders] = (0, import_react.useState)([]);
+    const [newCapabilityProviderKeys, setNewCapabilityProviderKeys] = (0, import_react.useState)([]);
     const [newCapabilityName, setNewCapabilityName] = (0, import_react.useState)("");
     const [newCapabilityDescription, setNewCapabilityDescription] = (0, import_react.useState)("");
     const [newCapabilityInstructions, setNewCapabilityInstructions] = (0, import_react.useState)("");
@@ -24901,20 +24908,21 @@
         unified2 += capability.unified_token_count ?? 0;
         specifics += capability.specific_token_count ?? 0;
         for (const item of capability.provider_token_counts ?? []) {
-          const current = byProvider.get(item.provider_kind) ?? { providerName: item.provider_name, tokenCount: 0 };
+          const current = byProvider.get(item.provider_key) ?? { providerName: item.provider_name, tokenCount: 0 };
           current.tokenCount += item.token_count;
-          byProvider.set(item.provider_kind, current);
+          byProvider.set(item.provider_key, current);
         }
       }
       return {
         unified: unified2,
         specifics,
         allTracked: unified2 + specifics,
-        byProvider: [...byProvider.entries()].map(([providerKind, item]) => ({ providerKind, ...item })).sort((a, b) => a.providerName.localeCompare(b.providerName))
+        byProvider: [...byProvider.entries()].map(([providerKey, item]) => ({ providerKey, ...item })).sort((a, b) => a.providerName.localeCompare(b.providerName))
       };
     }, [capabilities]);
     const providerOptions = (0, import_react.useMemo)(
       () => (data?.providers ?? []).map((provider) => ({
+        providerKey: provider.key,
         providerKind: provider.kind,
         providerName: provider.name
       })),
@@ -24951,10 +24959,10 @@
       setTransferCapabilityId("");
     }, [scope, targetCwd]);
     (0, import_react.useEffect)(() => {
-      setNewCapabilityProviders((current) => {
-        const available = new Set(providerOptions.map((provider) => provider.providerKind));
-        const kept = current.filter((kind) => available.has(kind));
-        return kept.length > 0 ? kept : providerOptions.map((provider) => provider.providerKind);
+      setNewCapabilityProviderKeys((current) => {
+        const available = new Set(providerOptions.map((provider) => provider.providerKey));
+        const kept = current.filter((key) => available.has(key));
+        return kept.length > 0 ? kept : providerOptions.map((provider) => provider.providerKey);
       });
     }, [providerOptions]);
     (0, import_react.useEffect)(() => {
@@ -25053,14 +25061,14 @@
     }, [targetCwd, fetchSync]);
     const createCapability = (0, import_react.useCallback)(async () => {
       const name = newCapabilityName.trim();
-      if (!name || newCapabilityProviders.length === 0) return;
+      if (!name || newCapabilityProviderKeys.length === 0) return;
       setBusy(true);
       try {
         const body = {
           cwd: targetCwd,
           scope,
           category: newCapabilityCategory,
-          provider_kinds: newCapabilityProviders,
+          provider_keys: newCapabilityProviderKeys,
           name,
           description: newCapabilityDescription.trim(),
           instructions: newCapabilityInstructions,
@@ -25083,12 +25091,17 @@
       targetCwd,
       scope,
       newCapabilityCategory,
-      newCapabilityProviders,
+      newCapabilityProviderKeys,
       newCapabilityName,
       newCapabilityDescription,
       newCapabilityInstructions,
       fetchSync
     ]);
+    const openCreateCapability = (0, import_react.useCallback)((category = "skill") => {
+      setNewCapabilityCategory(category);
+      setNewCapabilityProviderKeys(providerOptions.map((provider) => provider.providerKey));
+      setCreateOpen(true);
+    }, [providerOptions]);
     const transferCapability = (0, import_react.useCallback)(async (capability) => {
       if (!canTransferCapability(capability) || !transferTargetScope) return;
       if (transferTargetScope === "project" && !transferTargetCwd) return;
@@ -25299,7 +25312,7 @@
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "select",
               {
-                "aria-label": "Provider sync project",
+                "aria-label": "Provider Config Sync project",
                 value: selectedProjectPath,
                 onChange: (e) => {
                   setSelectedProjectPath(e.target.value);
@@ -25328,8 +25341,11 @@
                   title: "Add capability",
                   disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
                   onClick: () => {
-                    setNewCapabilityProviders(providerOptions.map((provider) => provider.providerKind));
-                    setCreateOpen((current) => !current);
+                    if (createOpen) {
+                      setCreateOpen(false);
+                      return;
+                    }
+                    openCreateCapability();
                   },
                   children: "+"
                 }
@@ -25351,12 +25367,12 @@
                   "input",
                   {
                     type: "checkbox",
-                    checked: newCapabilityProviders.includes(provider.providerKind),
-                    onChange: (e) => setNewCapabilityProviders((current) => e.target.checked ? [...current, provider.providerKind] : current.filter((kind) => kind !== provider.providerKind))
+                    checked: newCapabilityProviderKeys.includes(provider.providerKey),
+                    onChange: (e) => setNewCapabilityProviderKeys((current) => e.target.checked ? [...current, provider.providerKey] : current.filter((key) => key !== provider.providerKey))
                   }
                 ),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: provider.providerName })
-              ] }, provider.providerKind)) }),
+              ] }, provider.providerKey)) }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "input",
                 {
@@ -25392,7 +25408,7 @@
                 {
                   type: "button",
                   className: "btn-primary",
-                  disabled: busy || !newCapabilityName.trim() || newCapabilityProviders.length === 0,
+                  disabled: busy || !newCapabilityName.trim() || newCapabilityProviderKeys.length === 0,
                   onClick: () => void createCapability(),
                   children: "Add capability"
                 }
@@ -25414,7 +25430,7 @@
               scopeTokenTotals.byProvider.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.providerName }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: formatTokens(item.tokenCount) })
-              ] }, item.providerKind))
+              ] }, item.providerKey))
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-file-list", children: [
               capabilityGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
@@ -25422,23 +25438,37 @@
                 {
                   className: `provider-config-sync-capability-group${collapsedGroups[group.category] ? " is-collapsed" : ""}`,
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                      "button",
-                      {
-                        type: "button",
-                        className: "provider-config-sync-capability-group-title",
-                        "aria-expanded": !collapsedGroups[group.category],
-                        onClick: () => setCollapsedGroups((current) => ({
-                          ...current,
-                          [group.category]: !current[group.category]
-                        })),
-                        children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
-                        ]
-                      }
-                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-group-header", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "provider-config-sync-capability-group-title",
+                          "aria-expanded": !collapsedGroups[group.category],
+                          onClick: () => setCollapsedGroups((current) => ({
+                            ...current,
+                            [group.category]: !current[group.category]
+                          })),
+                          children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "provider-config-sync-capability-group-chevron", children: collapsedGroups[group.category] ? ">" : "v" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: group.label }),
+                            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: group.capabilities.length })
+                          ]
+                        }
+                      ),
+                      CREATE_CAPABILITY_CATEGORIES.some((category) => category.id === group.category) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "btn-secondary provider-config-sync-icon-action provider-config-sync-capability-group-add",
+                          "aria-label": `Add ${group.label} capability`,
+                          title: `Add ${group.label} capability`,
+                          disabled: busy || providerOptions.length === 0 || scope === "project" && !targetCwd,
+                          onClick: () => openCreateCapability(group.category),
+                          children: "+"
+                        }
+                      )
+                    ] }),
                     !collapsedGroups[group.category] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-capability-group-items", children: group.capabilities.map((capability) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-capability-item", children: [
                       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                         "button",
@@ -25620,7 +25650,15 @@
                   ] }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: selectedSpecific.path })
                 ] }),
-                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific: selectedSpecific }) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                selectedSpecific.read_error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "provider-config-sync-empty", children: selectedSpecific.read_error }) : !selectedSpecific.exists ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  StructuredMissingSpecific,
+                  {
+                    specific: selectedSpecific,
+                    busy,
+                    writable: !!selectedSpecific.writable && !selectedSpecific.disabled && !!unified?.exists,
+                    onApply: () => void apply(selectedCapability, unified, selectedSpecific)
+                  }
+                ) : isStructuredCapability(selectedCapability) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   StructuredSpecificView,
                   {
                     busy,
@@ -25633,7 +25671,8 @@
                     onUnifiedContentChange: (content) => updateDraft(unified, content),
                     onSpecificContentChange: (content) => updateDraft(selectedSpecific, content),
                     onSaveUnified: () => void saveFile(unified),
-                    onSaveSpecific: () => void saveFile(selectedSpecific)
+                    onSaveSpecific: () => void saveFile(selectedSpecific),
+                    onApply: () => void apply(selectedCapability, unified, selectedSpecific)
                   }
                 ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   EditableAlignedFileDiff,
@@ -25743,9 +25782,20 @@
     onUnifiedContentChange,
     onSpecificContentChange,
     onSaveUnified,
-    onSaveSpecific
+    onSaveSpecific,
+    onApply
   }) {
-    if (!specific.exists) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StructuredMissingSpecific, { specific });
+    if (!specific.exists) {
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        StructuredMissingSpecific,
+        {
+          specific,
+          busy,
+          writable: !!specific.writable && !specific.disabled && !!unified.exists,
+          onApply
+        }
+      );
+    }
     if (capability.capability_id === "mcp") {
       const unifiedServers = parseMcpServers(unifiedContent);
       const specificServers = parseMcpServers(specific.content);
@@ -26376,14 +26426,20 @@
       }) })
     ] });
   }
-  function StructuredMissingSpecific({ specific }) {
+  function StructuredMissingSpecific({
+    specific,
+    busy,
+    writable,
+    onApply
+  }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "provider-config-sync-empty", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "Not configured yet." }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
         "Apply unified to create ",
         specific.label,
         "."
-      ] })
+      ] }),
+      writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-primary", disabled: busy, onClick: onApply, children: "Apply unified" })
     ] });
   }
   function McpServerFields({
