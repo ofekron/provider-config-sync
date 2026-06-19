@@ -208,3 +208,19 @@ export interface ProviderConfigSyncCapabilityPickerOutput {
 export interface ProviderConfigSyncCapabilityPickerResponse {
   sources: ProviderConfigSyncCapabilityPickerSource[];
 }
+
+export interface ProviderConfigSyncRepositoryStatus {
+  enabled: boolean;
+  auto_apply: boolean;
+  remote_url: string;
+  checkout_path: string;
+  checkout_exists: boolean;
+  last_synced_at?: string;
+  last_error?: string;
+  apply?: { updated: number; considered: number };
+}
+
+export interface ProviderConfigSyncRepositoryRequest {
+  remote_url: string;
+  auto_apply: boolean;
+}

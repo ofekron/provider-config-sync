@@ -13,6 +13,8 @@ import type {
   ProviderConfigSyncDeleteCapabilityRequest,
   ProviderConfigSyncResponse,
   ProviderConfigSyncRestoreRequest,
+  ProviderConfigSyncRepositoryRequest,
+  ProviderConfigSyncRepositoryStatus,
   ProviderConfigSyncTransferCapabilityRequest,
   ProviderConfigSyncWriteRequest,
 } from "@better-agent/provider-config-sync-core";
@@ -50,6 +52,10 @@ export interface ProviderConfigSyncApiClient {
   apply(body: ProviderConfigSyncApplyRequest): Promise<void>;
   autoSync(body: ProviderConfigSyncAutoRequest): Promise<ProviderConfigSyncAutoResponse>;
   listCapabilityPickerSources(cwd: string): Promise<ProviderConfigSyncCapabilityPickerResponse>;
+  getRepositoryStatus(): Promise<ProviderConfigSyncRepositoryStatus>;
+  initRepository(body: ProviderConfigSyncRepositoryRequest): Promise<ProviderConfigSyncRepositoryStatus>;
+  loadRepository(body: ProviderConfigSyncRepositoryRequest): Promise<ProviderConfigSyncRepositoryStatus>;
+  syncRepository(): Promise<ProviderConfigSyncRepositoryStatus>;
 }
 
 export interface FetchProviderConfigSyncClientOptions {
@@ -69,6 +75,10 @@ export interface ProviderConfigSyncFetchRoutes {
   apply: string;
   autoSync: string;
   capabilityPicker: string;
+  repository: string;
+  repositoryInit: string;
+  repositoryLoad: string;
+  repositorySync: string;
 }
 
 export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
@@ -82,6 +92,10 @@ export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
   apply: "/api/provider-config-sync/apply",
   autoSync: "/api/provider-config-sync/auto-sync",
   capabilityPicker: "/api/provider-config-sync/capability-picker",
+  repository: "/api/provider-config-sync/repository",
+  repositoryInit: "/api/provider-config-sync/repository/init",
+  repositoryLoad: "/api/provider-config-sync/repository/load",
+  repositorySync: "/api/provider-config-sync/repository/sync",
 };
 
 export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
@@ -95,6 +109,10 @@ export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchR
   apply: "/api/provider-config-sync/apply",
   autoSync: "/api/provider-config-sync/auto-sync",
   capabilityPicker: "/api/provider-config-sync/capability-picker",
+  repository: "/api/provider-config-sync/repository",
+  repositoryInit: "/api/provider-config-sync/repository/init",
+  repositoryLoad: "/api/provider-config-sync/repository/load",
+  repositorySync: "/api/provider-config-sync/repository/sync",
 };
 
 function pathWithParams(path: string, params: URLSearchParams): string {
@@ -166,6 +184,22 @@ export function createFetchProviderConfigSyncClient(
       if (cwd) params.set("cwd", cwd);
       return request<ProviderConfigSyncCapabilityPickerResponse>(pathWithParams(routes.capabilityPicker, params));
     },
+    getRepositoryStatus: () =>
+      request<ProviderConfigSyncRepositoryStatus>(routes.repository),
+    initRepository: (body) =>
+      request<ProviderConfigSyncRepositoryStatus>(routes.repositoryInit, {
+        method: "POST",
+        body: json(body),
+      }),
+    loadRepository: (body) =>
+      request<ProviderConfigSyncRepositoryStatus>(routes.repositoryLoad, {
+        method: "POST",
+        body: json(body),
+      }),
+    syncRepository: () =>
+      request<ProviderConfigSyncRepositoryStatus>(routes.repositorySync, {
+        method: "POST",
+      }),
   };
 }
 

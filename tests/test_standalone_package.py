@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import tomllib
@@ -991,6 +992,51 @@ def t_auto_sync_settings_resolve_hierarchy() -> None:
         shutil.rmtree(wipe)
 
 
+def t_repository_load_maps_project_by_git_remote_and_applies_provider_files() -> None:
+    wipe = Path(tempfile.mkdtemp(prefix="provider-config-sync-repo-"))
+    try:
+        remote = wipe / "remote.git"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        project_a = (wipe / "machine-a" / "project").resolve()
+        project_a.mkdir(parents=True)
+        sync_a = wipe / "sync-a"
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude-a")},
+            ],
+            project_records=lambda: [
+                {"path": str(project_a), "node_id": "primary", "name": "Project", "git_remote": "git@example.com:team/project.git"},
+            ],
+            sync_home=lambda: sync_a,
+            broadcast_changed=_noop,
+        )
+        payload = api._discover(str(project_a))
+        instructions = next(capability for capability in payload["groups"]["project"] if capability["capability_id"] == "instructions")
+        unified_path = Path(instructions["unified"]["path"])
+        unified_path.parent.mkdir(parents=True, exist_ok=True)
+        unified_path.write_text("repo project instructions\n", encoding="utf-8")
+        asyncio.run(api.init_repository_route(api.RepositoryConfigRequest(remote_url=str(remote))))
+
+        project_b = (wipe / "machine-b" / "renamed-project").resolve()
+        project_b.mkdir(parents=True)
+        sync_b = wipe / "sync-b"
+        api.configure(
+            provider_records=lambda: [
+                {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": str(wipe / "claude-b")},
+            ],
+            project_records=lambda: [
+                {"path": str(project_b), "node_id": "primary", "name": "Renamed", "git_remote": "git@example.com:team/project.git"},
+            ],
+            sync_home=lambda: sync_b,
+            broadcast_changed=_noop,
+        )
+        result = asyncio.run(api.load_repository_route(api.RepositoryConfigRequest(remote_url=str(remote))))
+        check(result["apply"]["updated"] >= 1, "repository load applies unified config to provider files")
+        check((project_b / "CLAUDE.md").read_text(encoding="utf-8") == "repo project instructions\n", "repo project config maps by git remote across paths")
+    finally:
+        shutil.rmtree(wipe)
+
+
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
@@ -1014,6 +1060,7 @@ def main() -> int:
     t_auto_sync_llm_mode_uses_configured_reviewer()
     t_auto_sync_llm_can_review_one_hunk()
     t_auto_sync_settings_resolve_hierarchy()
+    t_repository_load_maps_project_by_git_remote_and_applies_provider_files()
     if FAILURES:
         print(f"\nFAILED: {len(FAILURES)}")
         for failure in FAILURES:

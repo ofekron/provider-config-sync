@@ -10,13 +10,16 @@ import logging
 import math
 import os
 import re
+import shutil
 import stat
+import subprocess
 import tempfile
 import threading
 import tomllib
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -60,6 +63,8 @@ _CODEX_COMMAND_SKILL_KIND_KEY = "provider-config-sync-kind"
 _CODEX_COMMAND_SKILL_NAME_KEY = "provider-config-sync-name"
 _CODEX_COMMAND_SKILL_DESCRIPTION_KEY = "provider-config-sync-description"
 _lock = threading.Lock()
+_repo_sync_lock = threading.Lock()
+_repo_push_in_progress = False
 
 
 def _default_sync_home() -> Path:
@@ -1965,6 +1970,289 @@ def update_auto_sync_settings(req: AutoSyncSettingsPatch) -> dict:
     }
 
 
+def _now_iso() -> str:
+    return datetime.now().isoformat()
+
+
+def _repository_settings_path() -> Path:
+    return _sync_home_source() / "provider-config-sync" / "repository.json"
+
+
+def _repository_checkout_path() -> Path:
+    return _sync_home_source() / "provider-config-sync" / "repository"
+
+
+def _repository_payload_path() -> Path:
+    return _repository_checkout_path() / "provider-config-sync"
+
+
+def _repository_settings() -> dict:
+    path = _repository_settings_path()
+    if not path.exists():
+        return {"enabled": False, "auto_apply": True, "remote_url": "", "last_synced_at": "", "last_error": ""}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"enabled": False, "auto_apply": True, "remote_url": "", "last_synced_at": "", "last_error": ""}
+    if not isinstance(data, dict):
+        return {"enabled": False, "auto_apply": True, "remote_url": "", "last_synced_at": "", "last_error": ""}
+    return {
+        "enabled": bool(data.get("enabled")),
+        "auto_apply": data.get("auto_apply") is not False,
+        "remote_url": str(data.get("remote_url") or ""),
+        "last_synced_at": data.get("last_synced_at") if isinstance(data.get("last_synced_at"), str) else "",
+        "last_error": data.get("last_error") if isinstance(data.get("last_error"), str) else "",
+    }
+
+
+def _write_repository_settings(settings: dict) -> None:
+    path = _repository_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(settings, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _safe_remote_url(remote_url: str) -> str:
+    value = str(remote_url or "").strip()
+    if not value or value.startswith("-") or any(ch in value for ch in "\r\n\0"):
+        raise HTTPException(status_code=400, detail="remote_url is invalid")
+    return value
+
+
+def _run_git(args: list[str], cwd: Path | None = None, timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(cwd) if cwd else None,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _require_git_ok(result: subprocess.CompletedProcess[str], action: str) -> None:
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or action).strip()
+        raise HTTPException(status_code=400, detail=f"{action} failed: {detail}")
+
+
+def _copy_dir_contents(src: Path, dst: Path) -> None:
+    if dst.exists():
+        shutil.rmtree(dst)
+    if src.exists():
+        shutil.copytree(src, dst)
+
+
+def _project_digest(path: str) -> str:
+    return hashlib.sha256(str(_expand_path(path).resolve()).encode("utf-8")).hexdigest()
+
+
+def _repository_manifest() -> dict:
+    projects = []
+    for project in _project_records_source():
+        if (project.get("node_id") or "primary") != "primary" or not project.get("path"):
+            continue
+        path = str(_expand_path(str(project["path"])).resolve())
+        projects.append(
+            {
+                "digest": _project_digest(path),
+                "path": path,
+                "name": project.get("name") or Path(path).name or path,
+                "git_remote": project.get("git_remote") or "",
+            }
+        )
+    return {"version": 1, "projects": projects}
+
+
+def _read_repository_manifest() -> dict:
+    path = _repository_payload_path() / "manifest.json"
+    if not path.exists():
+        return {"version": 1, "projects": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"version": 1, "projects": []}
+    if not isinstance(data, dict):
+        return {"version": 1, "projects": []}
+    projects = data.get("projects")
+    return {"version": 1, "projects": projects if isinstance(projects, list) else []}
+
+
+def _local_project_by_repo_key() -> dict[str, str]:
+    by_key: dict[str, str] = {}
+    for project in _project_records_source():
+        if (project.get("node_id") or "primary") != "primary" or not project.get("path"):
+            continue
+        path = str(_expand_path(str(project["path"])).resolve())
+        by_key[f"path:{path}"] = _project_digest(path)
+        git_remote = str(project.get("git_remote") or "").strip()
+        if git_remote:
+            by_key[f"git:{git_remote}"] = _project_digest(path)
+    return by_key
+
+
+def _export_sync_home_to_checkout() -> None:
+    payload = _repository_payload_path()
+    payload.mkdir(parents=True, exist_ok=True)
+    root = _sync_home_source() / "provider-config-sync"
+    for name in ("global", "projects"):
+        _copy_dir_contents(root / name, payload / name)
+    settings = root / "settings.json"
+    target_settings = payload / "settings.json"
+    if settings.exists():
+        target_settings.write_text(settings.read_text(encoding="utf-8"), encoding="utf-8")
+    elif target_settings.exists():
+        target_settings.unlink()
+    (payload / "manifest.json").write_text(
+        json.dumps(_repository_manifest(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _import_checkout_to_sync_home() -> None:
+    payload = _repository_payload_path()
+    if not payload.exists():
+        raise HTTPException(status_code=400, detail="repository does not contain provider-config-sync payload")
+    root = _sync_home_source() / "provider-config-sync"
+    for name in ("global", "projects"):
+        if name == "global":
+            _copy_dir_contents(payload / name, root / name)
+        else:
+            target_projects = root / "projects"
+            target_projects.mkdir(parents=True, exist_ok=True)
+            manifest = _read_repository_manifest()
+            local_by_key = _local_project_by_repo_key()
+            for project in manifest["projects"]:
+                if not isinstance(project, dict):
+                    continue
+                source_digest = str(project.get("digest") or "")
+                if not source_digest:
+                    continue
+                target_digest = ""
+                git_remote = str(project.get("git_remote") or "").strip()
+                path = str(project.get("path") or "").strip()
+                if git_remote:
+                    target_digest = local_by_key.get(f"git:{git_remote}", "")
+                if not target_digest and path:
+                    target_digest = local_by_key.get(f"path:{path}", "")
+                if not target_digest:
+                    continue
+                _copy_dir_contents(payload / "projects" / source_digest, target_projects / target_digest)
+    source_settings = payload / "settings.json"
+    target_settings = root / "settings.json"
+    if source_settings.exists():
+        target_settings.write_text(source_settings.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def _ensure_checkout(remote_url: str | None = None) -> Path:
+    checkout = _repository_checkout_path()
+    checkout.parent.mkdir(parents=True, exist_ok=True)
+    if not (checkout / ".git").exists():
+        if checkout.exists():
+            shutil.rmtree(checkout)
+        checkout.mkdir(parents=True, exist_ok=True)
+        _require_git_ok(_run_git(["init"], checkout), "git init")
+    _run_git(["config", "user.name", "Provider Config Sync"], checkout)
+    _run_git(["config", "user.email", "provider-config-sync@local"], checkout)
+    if remote_url:
+        existing = _run_git(["remote", "get-url", "origin"], checkout)
+        if existing.returncode == 0:
+            _require_git_ok(_run_git(["remote", "set-url", "origin", remote_url], checkout), "git remote set-url")
+        else:
+            _require_git_ok(_run_git(["remote", "add", "origin", remote_url], checkout), "git remote add")
+    return checkout
+
+
+def _commit_checkout(message: str) -> bool:
+    checkout = _repository_checkout_path()
+    _require_git_ok(_run_git(["add", "provider-config-sync"], checkout), "git add")
+    diff = _run_git(["diff", "--cached", "--quiet"], checkout)
+    if diff.returncode == 0:
+        return False
+    _require_git_ok(_run_git(["commit", "-m", message], checkout), "git commit")
+    return True
+
+
+def _push_checkout(remote_url: str) -> None:
+    checkout = _repository_checkout_path()
+    branch = _run_git(["branch", "--show-current"], checkout).stdout.strip() or "main"
+    _require_git_ok(_run_git(["push", "-u", "origin", branch], checkout, timeout=120), "git push")
+
+
+def _pull_checkout(remote_url: str) -> None:
+    checkout = _repository_checkout_path()
+    if (checkout / ".git").exists():
+        _require_git_ok(_run_git(["remote", "set-url", "origin", remote_url], checkout), "git remote set-url")
+        _require_git_ok(_run_git(["pull", "--ff-only", "origin"], checkout, timeout=120), "git pull")
+        return
+    if checkout.exists():
+        shutil.rmtree(checkout)
+    _require_git_ok(_run_git(["clone", remote_url, str(checkout)], None, timeout=120), "git clone")
+
+
+def _apply_unified_repo_state_to_provider_files() -> dict:
+    updated = 0
+    considered = 0
+    cwds = [""]
+    for project in _project_records_source():
+        if (project.get("node_id") or "primary") == "primary" and project.get("path"):
+            cwds.append(str(project["path"]))
+    with _lock:
+        for cwd in cwds:
+            payload = _discover(cwd)
+            for capability in payload["capabilities"]:
+                unified = capability["unified"]
+                if not unified.get("exists"):
+                    continue
+                for entry in capability["specifics"]:
+                    considered += 1
+                    if not entry.get("writable"):
+                        continue
+                    current, exists = _read_entry_current(entry)
+                    if exists and current == unified["content"]:
+                        continue
+                    _write_entry_if_unchanged(entry, current if exists else None, unified["content"])
+                    updated += 1
+    return {"updated": updated, "considered": considered}
+
+
+def _repository_status() -> dict:
+    settings = _repository_settings()
+    checkout = _repository_checkout_path()
+    return {
+        **settings,
+        "checkout_path": str(checkout),
+        "checkout_exists": (checkout / ".git").exists(),
+    }
+
+
+def _repository_push_snapshot() -> None:
+    global _repo_push_in_progress
+    settings = _repository_settings()
+    if not settings["enabled"] or not settings["remote_url"]:
+        return
+    if _repo_push_in_progress:
+        return
+    with _repo_sync_lock:
+        if _repo_push_in_progress:
+            return
+        _repo_push_in_progress = True
+        try:
+            remote_url = _safe_remote_url(settings["remote_url"])
+            _ensure_checkout(remote_url)
+            _export_sync_home_to_checkout()
+            _commit_checkout("Sync provider config")
+            _push_checkout(remote_url)
+            settings["last_synced_at"] = _now_iso()
+            settings["last_error"] = ""
+            _write_repository_settings(settings)
+        except Exception as exc:
+            settings["last_error"] = str(exc)
+            _write_repository_settings(settings)
+            logger.warning("provider config repository push failed", exc_info=True)
+        finally:
+            _repo_push_in_progress = False
+
+
 def _discover(cwd: str) -> dict:
     by_entry: dict[str, dict] = {}
     project_root: Path | None = None
@@ -2443,6 +2731,7 @@ async def _broadcast_changed(scope: str, category: str, capability_id: str, path
     result = _broadcast_changed_source(scope, category, capability_id, path, cwd)
     if hasattr(result, "__await__"):
         await result
+    await asyncio.to_thread(_repository_push_snapshot)
 
 
 @router.get("")
@@ -2466,6 +2755,75 @@ async def list_provider_config_sync_projects():
             }
         )
     return {"projects": projects}
+
+
+class RepositoryConfigRequest(BaseModel):
+    remote_url: str
+    auto_apply: bool = True
+
+
+@router.get("/repository")
+async def get_repository_status_route():
+    return _repository_status()
+
+
+@router.post("/repository/init")
+async def init_repository_route(req: RepositoryConfigRequest):
+    remote_url = _safe_remote_url(req.remote_url)
+    with _repo_sync_lock:
+        checkout = _ensure_checkout(remote_url)
+        _export_sync_home_to_checkout()
+        _commit_checkout("Initialize provider config sync")
+        _push_checkout(remote_url)
+        settings = {
+            "enabled": True,
+            "auto_apply": bool(req.auto_apply),
+            "remote_url": remote_url,
+            "last_synced_at": _now_iso(),
+            "last_error": "",
+        }
+        _write_repository_settings(settings)
+        return {**_repository_status(), "checkout_path": str(checkout)}
+
+
+@router.post("/repository/load")
+async def load_repository_route(req: RepositoryConfigRequest):
+    remote_url = _safe_remote_url(req.remote_url)
+    with _repo_sync_lock:
+        _pull_checkout(remote_url)
+        _import_checkout_to_sync_home()
+        apply_result = _apply_unified_repo_state_to_provider_files() if req.auto_apply else {"updated": 0, "considered": 0}
+        settings = {
+            "enabled": True,
+            "auto_apply": bool(req.auto_apply),
+            "remote_url": remote_url,
+            "last_synced_at": _now_iso(),
+            "last_error": "",
+        }
+        _write_repository_settings(settings)
+        return {**_repository_status(), "apply": apply_result}
+
+
+@router.post("/repository/sync")
+async def sync_repository_route():
+    settings = _repository_settings()
+    remote_url = _safe_remote_url(settings.get("remote_url") or "")
+    with _repo_sync_lock:
+        _pull_checkout(remote_url)
+        _import_checkout_to_sync_home()
+        apply_result = (
+            _apply_unified_repo_state_to_provider_files()
+            if settings.get("auto_apply") is not False
+            else {"updated": 0, "considered": 0}
+        )
+        _export_sync_home_to_checkout()
+        _commit_checkout("Sync provider config")
+        _push_checkout(remote_url)
+        settings["enabled"] = True
+        settings["last_synced_at"] = _now_iso()
+        settings["last_error"] = ""
+        _write_repository_settings(settings)
+        return {**_repository_status(), "apply": apply_result}
 
 
 def _picker_source_id(scope: str, source_cwd: str, category: str, capability_id: str) -> str:
@@ -2623,7 +2981,8 @@ class CreateCapabilityRequest(BaseModel):
     cwd: str = ""
     scope: str
     category: str
-    provider_keys: list[str]
+    provider_keys: list[str] = Field(default_factory=list)
+    provider_kinds: list[str] = Field(default_factory=list)
     name: str
     description: str = ""
     instructions: str = ""
@@ -2649,6 +3008,20 @@ def _providers_by_keys(provider_keys: list[str]) -> list[dict]:
     if missing:
         raise HTTPException(status_code=400, detail=f"unknown provider: {', '.join(missing)}")
     return [providers[key] for key in requested]
+
+
+def _providers_for_create_request(req: CreateCapabilityRequest) -> list[dict]:
+    if req.provider_keys:
+        return _providers_by_keys(req.provider_keys)
+    requested_kinds = [kind for kind in dict.fromkeys(req.provider_kinds) if kind]
+    if not requested_kinds:
+        raise HTTPException(status_code=400, detail="at least one provider is required")
+    providers = _provider_records()
+    selected = [provider for provider in providers if provider.get("kind") in requested_kinds]
+    missing = [kind for kind in requested_kinds if not any(provider.get("kind") == kind for provider in selected)]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"unknown provider kind: {', '.join(missing)}")
+    return selected
 
 
 def _project_root_for_scope(scope: str, cwd: str) -> Path | None:
@@ -2830,7 +3203,7 @@ async def delete_capability_route(req: DeleteCapabilityRequest):
 
 
 async def create_capability(req: CreateCapabilityRequest):
-    providers = _providers_by_keys(req.provider_keys)
+    providers = _providers_for_create_request(req)
     project_root = _project_root_for_scope(req.scope, req.cwd)
     candidates = [_new_capability_candidate(req, provider, project_root) for provider in providers]
     entries = _merged_entries_from_candidates(candidates)
