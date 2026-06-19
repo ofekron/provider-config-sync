@@ -1,9 +1,9 @@
 export { ProviderConfigSyncPage } from "./ProviderConfigSyncPage.js";
 export { ProviderCapabilityPicker, type ProviderCapabilityPickerProps } from "./ProviderCapabilityPicker.js";
 export {
-  BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES,
+  BETTER_AGENT_PROVIDER_CONFIG_SYNC_ROUTES,
   PROVIDER_CONFIG_SYNC_ROUTES,
-  createBetterClaudeProviderConfigSyncClient,
+  createBetterAgentProviderConfigSyncClient,
   createFetchProviderConfigSyncClient,
   type ProviderConfigSyncApiClient,
   type ProviderConfigSyncProject,
