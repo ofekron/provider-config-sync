@@ -27,6 +27,8 @@ import yaml
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from . import managed_blocks
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/provider-config-sync", tags=["provider-config-sync"])
@@ -427,6 +429,67 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
             if path.exists() or path == project_root / "AGENTS.md"
         ]
     return []
+
+
+def managed_instruction_targets(
+    *, scope: str, project_root: Path | None, providers: list[dict]
+) -> list[Path]:
+    """Canonical instruction file(s) per configured provider for a scope.
+
+    ``global`` -> each provider's home instruction file (``~/.claude/CLAUDE.md``,
+    ``~/.codex/AGENTS.md``, gemini context file). ``project`` -> the project-root
+    instruction file (``<root>/CLAUDE.md`` etc.). These are the files managed
+    instruction blocks are spliced into by extensions.
+    """
+    if scope not in {"global", "project"}:
+        raise HTTPException(status_code=400, detail=f"invalid scope: {scope}")
+    if scope == "project" and not project_root:
+        raise HTTPException(status_code=400, detail="project scope requires project_root")
+    root = _expand_path(project_root).resolve() if project_root else None
+    paths: list[Path] = []
+    for provider in providers:
+        kind = provider.get("kind", "")
+        if kind == "claude":
+            container = _provider_config_dir(provider) if scope == "global" else root
+            paths.append(container / "CLAUDE.md")
+        elif kind == "codex":
+            container = _codex_home(provider) if scope == "global" else root
+            paths.append(container / "AGENTS.md")
+        elif kind == "gemini":
+            config_dir = _provider_config_dir(provider)
+            names = _gemini_context_names(config_dir, root if scope == "project" else None)
+            container = config_dir if scope == "global" else root
+            paths.extend(container / name for name in names)
+    return _dedupe_paths(paths)
+
+
+def apply_managed_instruction_blocks(
+    *,
+    owner: str,
+    sections: list[tuple[str, str]],
+    scope: str,
+    project_root: Path | None,
+    providers: list[dict],
+) -> None:
+    """Insert/replace the managed block for every section across every target file."""
+    targets = managed_instruction_targets(scope=scope, project_root=project_root, providers=providers)
+    for path in targets:
+        for section_id, content in sections:
+            managed_blocks.upsert_block(path, owner, section_id, content)
+
+
+def clear_managed_instruction_blocks(
+    *,
+    owner: str,
+    scope: str,
+    project_root: Path | None,
+    providers: list[dict],
+) -> int:
+    """Remove every managed block owned by ``owner`` across every target file."""
+    removed = 0
+    for path in managed_instruction_targets(scope=scope, project_root=project_root, providers=providers):
+        removed += managed_blocks.remove_owner_blocks(path, owner)
+    return removed
 
 
 def _project_auto_memory_candidates(provider: dict, project_root: Path) -> list[Candidate]:
