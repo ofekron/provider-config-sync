@@ -107,13 +107,16 @@ def test_invalid_key_rejected(tmp_path):
         raise AssertionError(f"invalid owner {bad!r} should be rejected")
 
 
-def test_refuses_symlink_target(tmp_path):
+def test_writes_through_symlink_to_real_target(tmp_path):
     real = tmp_path / "real.md"
-    real.write_text("real\n", encoding="utf-8")
+    real.write_text("existing\n", encoding="utf-8")
     link = tmp_path / "CLAUDE.md"
     link.symlink_to(real)
-    try:
-        managed_blocks.upsert_block(link, OWNER, "rules", "x")
-    except ValueError:
-        return
-    raise AssertionError("symlink target should be refused")
+
+    managed_blocks.upsert_block(link, OWNER, "rules", "injected")
+
+    # The block lands in the real target file …
+    assert "injected" in real.read_text(encoding="utf-8")
+    # … and the symlink is preserved (not replaced by a regular file).
+    assert link.is_symlink()
+    assert "injected" in link.read_text(encoding="utf-8")

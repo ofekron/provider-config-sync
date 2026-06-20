@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import os
 import re
-import stat
 import tempfile
 from pathlib import Path
 
 _BRAND = "better-claude"
-_KEY_RE = re.compile(r"^[A-Za-z0-9_:-]+$")
+# Owner/section keys: extension ids and section names are validated to
+# [a-z0-9_.-] upstream, plus the "extension:" owner prefix uses ":". Dots,
+# hyphens, underscores are all safe inside an HTML comment sentinel.
+_KEY_RE = re.compile(r"^[A-Za-z0-9_.:-]+$")
 # Reject any content that tries to forge our sentinels — guarantees block
 # boundaries can never be hijacked by the managed text itself.
 _MARKER_RE = re.compile(r"<!-- (BEGIN|END) " + re.escape(_BRAND) + r":")
@@ -63,33 +65,37 @@ def _owner_regex(owner: str) -> re.Pattern:
     return re.compile(begin_prefix + r"[^\n]*?-->.*?" + end_prefix + r"[^\n]*?-->", re.DOTALL)
 
 
+def _resolve(path: Path) -> Path:
+    """Follow symlinks to the real file. Target paths are always PCS-resolved
+    provider instruction files (never extension-supplied), so following a
+    symlink honors the user's own config layout (symlinked CLAUDE.md is common).
+    """
+    return path.resolve(strict=False)
+
+
 def _read_text(path: Path) -> str | None:
-    """Current file text, ``None`` if it does not exist. Refuses symlinks."""
-    if path.is_symlink():
-        raise ValueError(f"refusing managed-block op on symlink: {path}")
-    try:
-        st = path.stat(follow_symlinks=False)
-    except OSError:
+    """Current file text, ``None`` if it does not exist."""
+    real = _resolve(path)
+    if not real.exists():
         return None
-    if not stat.S_ISREG(st.st_mode):
+    if not real.is_file():
         raise ValueError(f"refusing managed-block op on non-regular file: {path}")
-    return path.read_text(encoding="utf-8")
+    return real.read_text(encoding="utf-8")
 
 
 def _atomic_replace(path: Path, content: str) -> None:
-    if path.is_symlink():
-        raise ValueError(f"refusing managed-block write to symlink: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.parent.is_symlink() or not path.parent.is_dir():
-        raise ValueError(f"unsafe parent directory: {path.parent}")
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.bc-mb-", dir=path.parent)
+    real = _resolve(path)
+    real.parent.mkdir(parents=True, exist_ok=True)
+    if not real.parent.is_dir():
+        raise ValueError(f"unsafe parent directory: {real.parent}")
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{real.name}.bc-mb-", dir=real.parent)
     tmp = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
             fh.flush()
             os.fsync(fh.fileno())
-        os.replace(tmp, path)
+        os.replace(tmp, real)
     finally:
         if tmp.exists():
             tmp.unlink()
