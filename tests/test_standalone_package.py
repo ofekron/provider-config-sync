@@ -153,21 +153,21 @@ def t_standalone_app_loads_json_config() -> None:
         shutil.rmtree(wipe)
 
 
-def t_ui_client_keeps_better_claude_routes_explicit() -> None:
+def t_ui_client_keeps_better_agent_routes_explicit() -> None:
     client = _UI_CLIENT.read_text(encoding="utf-8")
     generic_routes = client.split("export const PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
-        "export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES",
+        "export const BETTER_AGENT_PROVIDER_CONFIG_SYNC_ROUTES",
         1,
     )[0]
-    better_claude_routes = client.split("export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
+    better_agent_routes = client.split("export const BETTER_AGENT_PROVIDER_CONFIG_SYNC_ROUTES", 1)[1].split(
         "function pathWithParams",
         1,
     )[0]
-    check("/api/provider-config-sync" not in generic_routes, "generic UI client does not depend on Better Claude provider-config-sync routes")
-    check("/api/projects" not in generic_routes, "generic UI client does not depend on Better Claude project route")
+    check("BETTER_AGENT" not in generic_routes, "generic UI client does not depend on Better Agent route constants")
+    check("/api/projects" not in generic_routes, "generic UI client does not depend on Better Agent project route")
     check("/api/provider-config-sync" in generic_routes, "generic UI client targets standalone package API")
-    check("/api/provider-config-sync" in better_claude_routes, "Better Claude route map is explicit")
-    check("createBetterClaudeProviderConfigSyncClient" in client, "Better Claude adapter has a named factory")
+    check("/api/provider-config-sync" in better_agent_routes, "Better Agent route map is explicit")
+    check("createBetterAgentProviderConfigSyncClient" in client, "Better Agent adapter has a named factory")
 
 
 def t_capability_picker_lists_global_and_known_project_sources() -> None:
@@ -239,6 +239,9 @@ def t_diff_line_editors_hide_textarea_chrome() -> None:
 
 def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
     styles = _UI_STYLES.read_text(encoding="utf-8")
+    def rule_for(selector: str) -> str:
+        return styles.split(f"\n{selector} {{", 1)[1].split("}", 1)[0]
+
     for selector in (
         ".provider-config-sync-main",
         ".provider-config-sync-editor-card",
@@ -248,13 +251,13 @@ def t_diff_views_use_natural_height_without_internal_scrolling() -> None:
         ".provider-config-sync-specifics-card",
         ".provider-config-sync-specifics",
     ):
-        rule = styles.split(f"{selector} {{", 1)[1].split("}", 1)[0]
+        rule = rule_for(selector)
         check("overflow: visible;" in rule, f"{selector} does not create an internal scroll view")
 
-    shell_rule = styles.split(".provider-config-sync-shell {", 1)[1].split("}", 1)[0]
-    editor_grid_rule = styles.split(".provider-config-sync-editor-grid {", 1)[1].split("}", 1)[0]
-    diff_body_rule = styles.split(".provider-config-sync-aligned-diff-body {", 1)[1].split("}", 1)[0]
-    specifics_rule = styles.split(".provider-config-sync-specifics {", 1)[1].split("}", 1)[0]
+    shell_rule = rule_for(".provider-config-sync-shell")
+    editor_grid_rule = rule_for(".provider-config-sync-editor-grid")
+    diff_body_rule = rule_for(".provider-config-sync-aligned-diff-body")
+    specifics_rule = rule_for(".provider-config-sync-specifics")
     check("flex: 1 0 auto;" in shell_rule, "shell can grow past the viewport")
     check("flex: 0 0 auto;" in editor_grid_rule, "editor grid uses content height")
     check("flex: 0 0 auto;" in diff_body_rule, "diff body uses content height")
@@ -1040,7 +1043,7 @@ def t_repository_load_maps_project_by_git_remote_and_applies_provider_files() ->
 def main() -> int:
     t_standalone_project_mcp_roundtrip()
     t_standalone_app_loads_json_config()
-    t_ui_client_keeps_better_claude_routes_explicit()
+    t_ui_client_keeps_better_agent_routes_explicit()
     t_capability_picker_lists_global_and_known_project_sources()
     t_diff_line_editors_hide_textarea_chrome()
     t_diff_views_use_natural_height_without_internal_scrolling()

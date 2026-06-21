@@ -46,7 +46,7 @@ Provider Config Sync gives those capabilities names, tracks a unified version, a
   Estimate config tokens per provider file, per unified capability, and across the whole project so config cost is visible.
 
 - **Standalone backend**
-  Run the sync engine as a standalone FastAPI service without Better Claude.
+  Run the sync engine as a standalone FastAPI service without Better Agent.
 
 - **Agent extension**
   Expose the same sync engine as an MCP server for Goose and other MCP-capable agents.
@@ -257,7 +257,7 @@ import { ProviderCapabilityPicker } from "@better-agent/provider-config-sync-ui"
 - **Picker is host-neutral**: Provider Config Sync can enumerate and render capability choices, but the embedding host owns what a selected capability means in its own workflow.
 - **No silent overwrites**: writes require the expected previous content.
 - **Format abstraction, not format erasure**: common fields get a common UI shape, provider-specific metadata survives round trips.
-- **Portable core**: the backend package has no Better Claude dependency.
+- **Portable core**: the backend package has no Better Agent dependency.
 
 ## License
 

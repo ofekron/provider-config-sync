@@ -98,7 +98,7 @@ export const PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
   repositorySync: "/api/provider-config-sync/repository/sync",
 };
 
-export const BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
+export const BETTER_AGENT_PROVIDER_CONFIG_SYNC_ROUTES: ProviderConfigSyncFetchRoutes = {
   projects: "/api/projects",
   state: "/api/provider-config-sync",
   settings: "/api/provider-config-sync/settings",
@@ -203,11 +203,11 @@ export function createFetchProviderConfigSyncClient(
   };
 }
 
-export function createBetterClaudeProviderConfigSyncClient(
+export function createBetterAgentProviderConfigSyncClient(
   options: Omit<FetchProviderConfigSyncClientOptions, "routes">,
 ): ProviderConfigSyncApiClient {
   return createFetchProviderConfigSyncClient({
     ...options,
-    routes: BETTER_CLAUDE_PROVIDER_CONFIG_SYNC_ROUTES,
+    routes: BETTER_AGENT_PROVIDER_CONFIG_SYNC_ROUTES,
   });
 }

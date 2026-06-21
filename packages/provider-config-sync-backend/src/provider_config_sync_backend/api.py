@@ -300,7 +300,7 @@ def _provider_config_dir(provider: dict) -> Path:
 
 def _provider_key(provider: dict) -> str:
     """Stable unique identity for a provider. `kind` alone is NOT unique:
-    Better Claude registers Z.AI as a second `kind:"claude"` provider (a
+    Better Agent registers Z.AI as a second `kind:"claude"` provider (a
     separate Anthropic-compatible config dir). kind+resolved-config-dir is."""
     return f"{provider.get('kind', '')}:{_provider_config_dir(provider)}"
 
