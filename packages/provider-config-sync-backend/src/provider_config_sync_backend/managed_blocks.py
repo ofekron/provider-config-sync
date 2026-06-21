@@ -167,3 +167,19 @@ def remove_owner_blocks(path: Path, owner: str) -> int:
 def has_owner_blocks(path: Path, owner: str) -> bool:
     current = _read_text(path)
     return bool(current) and _owner_regex(owner).search(current) is not None
+
+
+_OWNER_BEGIN_RE = re.compile(r"<!-- BEGIN " + re.escape(_BRAND) + r":(extension:[A-Za-z0-9_.-]+):")
+
+
+def owners_in(path: Path) -> list[str]:
+    """Distinct owner strings whose managed blocks appear in the file (insertion order)."""
+    current = _read_text(path)
+    if not current:
+        return []
+    seen: list[str] = []
+    for match in _OWNER_BEGIN_RE.finditer(current):
+        owner = match.group(1)
+        if owner not in seen:
+            seen.append(owner)
+    return seen
