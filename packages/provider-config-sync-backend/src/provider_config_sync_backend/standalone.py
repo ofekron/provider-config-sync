@@ -31,6 +31,7 @@ def _default_providers() -> list[dict[str, str]]:
         {"id": "claude", "name": "Claude", "kind": "claude", "config_dir": "~/.claude"},
         {"id": "gemini", "name": "Gemini", "kind": "gemini", "config_dir": "~/.gemini"},
         {"id": "codex", "name": "Codex", "kind": "codex", "config_dir": "~/.codex"},
+        {"id": "agy", "name": "Antigravity", "kind": "agy", "config_dir": "~/.gemini/antigravity-cli"},
     ]
 
 

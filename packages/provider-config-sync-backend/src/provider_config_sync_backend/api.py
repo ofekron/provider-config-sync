@@ -33,11 +33,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/provider-config-sync", tags=["provider-config-sync"])
 
-_KNOWN_KINDS = {"claude", "gemini", "codex"}
+_KNOWN_KINDS = {"claude", "gemini", "codex", "agy"}
 _DEFAULT_CONFIG_DIR = {
     "claude": "~/.claude",
     "gemini": "~/.gemini",
     "codex": "~/.codex",
+    "agy": "~/.gemini/antigravity-cli",
 }
 _BACKUP_SUFFIX = ".bc-sync-backup"
 _BACKUP_MARKER_SUFFIX = ".sha256"
@@ -279,6 +280,10 @@ def _codex_fallback_names(provider: dict | None = None) -> list[str]:
     return _safe_basenames(config.get("project_doc_fallback_filenames"))
 
 
+def _is_google_agent_kind(kind: str) -> bool:
+    return kind in {"gemini", "agy"}
+
+
 def _provider_records() -> list[dict]:
     return [
         provider
@@ -323,7 +328,7 @@ def _global_instruction_candidates(provider: dict) -> list[Candidate]:
                 True,
             )
         ]
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         return [
             Candidate(
                 _provider_config_dir(provider) / filename,
@@ -333,7 +338,7 @@ def _global_instruction_candidates(provider: dict) -> list[Candidate]:
                 _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
-                f"Gemini instructions ({filename})",
+                f"{name} instructions ({filename})",
                 "markdown",
                 True,
             )
@@ -388,9 +393,9 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
             for path in _dedupe_paths(paths)
             if path.exists() or path == project_root / "CLAUDE.md"
         ]
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         names = _gemini_context_names(_provider_config_dir(provider), project_root)
-        paths = [project_root / "GEMINI.md"]
+        paths = [project_root / "GEMINI.md", project_root / "AGENTS.md"]
         paths.extend(directory / filename for directory in dirs for filename in names)
         return [
             Candidate(
@@ -401,12 +406,12 @@ def _project_instruction_candidates(provider: dict, project_root: Path, cwd: str
                 _INSTRUCTIONS_CAPABILITY_NAME,
                 kind,
                 name,
-                f"Gemini instructions ({path.name})",
+                f"{name} instructions ({path.name})",
                 "markdown",
-                path == project_root / "GEMINI.md",
+                path in {project_root / "GEMINI.md", project_root / "AGENTS.md"},
             )
             for path in _dedupe_paths(paths)
-            if path.exists() or path == project_root / "GEMINI.md"
+            if path.exists() or path in {project_root / "GEMINI.md", project_root / "AGENTS.md"}
         ]
     if kind == "codex":
         names = ["AGENTS.md", "AGENTS.override.md", *_codex_fallback_names(provider)]
@@ -455,11 +460,13 @@ def managed_instruction_targets(
         elif kind == "codex":
             container = _codex_home(provider) if scope == "global" else root
             paths.append(container / "AGENTS.md")
-        elif kind == "gemini":
+        elif _is_google_agent_kind(kind):
             config_dir = _provider_config_dir(provider)
             names = _gemini_context_names(config_dir, root if scope == "project" else None)
             container = config_dir if scope == "global" else root
             paths.extend(container / name for name in names)
+            if scope == "project":
+                paths.append(root / "AGENTS.md")
     return _dedupe_paths(paths)
 
 
@@ -528,7 +535,7 @@ def _skill_roots_for_provider(
     if scope == "global":
         if kind == "claude":
             return [("", _agents_skills_dir()), ("", _provider_config_dir(provider) / "skills")]
-        if kind == "gemini":
+        if _is_google_agent_kind(kind):
             return [("", _agents_skills_dir()), ("", _provider_config_dir(provider) / "skills")]
         if kind == "codex":
             return [("", _agents_skills_dir())]
@@ -542,7 +549,7 @@ def _skill_roots_for_provider(
         rel = "." if directory == project_root else directory.relative_to(project_root).as_posix()
         if kind == "claude":
             roots.append((rel, directory / ".claude" / "skills"))
-        elif kind == "gemini":
+        elif _is_google_agent_kind(kind):
             roots.extend([(rel, directory / ".agents" / "skills"), (rel, directory / ".gemini" / "skills")])
         elif kind == "codex":
             roots.append((rel, directory / ".agents" / "skills"))
@@ -684,7 +691,7 @@ def _agent_roots_for_provider(
     if scope == "global":
         if kind == "claude":
             return [_provider_config_dir(provider) / "agents"]
-        if kind == "gemini":
+        if _is_google_agent_kind(kind):
             return [_provider_config_dir(provider) / "agents"]
         if kind == "codex":
             return [_codex_home(provider) / "agents"]
@@ -693,7 +700,7 @@ def _agent_roots_for_provider(
         return []
     if kind == "claude":
         return [project_root / ".claude" / "agents"]
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         return [project_root / ".gemini" / "agents"]
     if kind == "codex":
         return [project_root / ".codex" / "agents"]
@@ -745,7 +752,7 @@ def _command_roots_for_provider(
     if scope == "global":
         if kind == "claude":
             return [_provider_config_dir(provider) / "commands"]
-        if kind == "gemini":
+        if _is_google_agent_kind(kind):
             return [_provider_config_dir(provider) / "commands"]
         if kind == "codex":
             return [_agents_skills_dir()]
@@ -754,7 +761,7 @@ def _command_roots_for_provider(
         return []
     if kind == "claude":
         return [project_root / ".claude" / "commands"]
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         return [project_root / ".gemini" / "commands"]
     if kind == "codex":
         return [project_root / ".agents" / "skills"]
@@ -764,11 +771,11 @@ def _command_roots_for_provider(
 def _command_content_kind(provider_kind: str) -> str:
     if provider_kind == "codex":
         return _CONTENT_CODEX_COMMAND_SKILL
-    return _CONTENT_TOML_COMMAND if provider_kind == "gemini" else _CONTENT_MARKDOWN_COMMAND
+    return _CONTENT_TOML_COMMAND if provider_kind in {"gemini", "agy"} else _CONTENT_MARKDOWN_COMMAND
 
 
 def _command_suffix(provider_kind: str) -> str:
-    return ".toml" if provider_kind == "gemini" else ".md"
+    return ".toml" if provider_kind in {"gemini", "agy"} else ".md"
 
 
 def _command_capability_id(name: str) -> str:
@@ -1209,8 +1216,9 @@ def _global_config_candidates(provider: dict) -> list[Candidate]:
                 )
             )
         return candidates
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         path = _provider_config_dir(provider) / "settings.json"
+        mcp_path = path if kind == "gemini" else _provider_config_dir(provider) / "mcp_config.json"
         return [
             Candidate(
                 path,
@@ -1220,19 +1228,19 @@ def _global_config_candidates(provider: dict) -> list[Candidate]:
                 "Provider settings",
                 kind,
                 name,
-                "Gemini settings",
+                f"{name} settings",
                 "json",
                 True,
             ),
             Candidate(
-                path,
+                mcp_path,
                 "global",
                 "config",
                 _MCP_CAPABILITY_ID,
                 _MCP_CAPABILITY_NAME,
                 kind,
                 name,
-                "Gemini MCP",
+                f"{name} MCP",
                 "json",
                 True,
                 _CONTENT_JSON_MCP,
@@ -1317,8 +1325,9 @@ def _project_config_candidates(provider: dict, project_root: Path) -> list[Candi
                 )
             )
         return candidates
-    if kind == "gemini":
+    if _is_google_agent_kind(kind):
         path = project_root / ".gemini" / "settings.json"
+        mcp_path = path if kind == "gemini" else project_root / ".agents" / "mcp_config.json"
         return [
             Candidate(
                 path,
@@ -1328,19 +1337,19 @@ def _project_config_candidates(provider: dict, project_root: Path) -> list[Candi
                 "Provider settings",
                 kind,
                 name,
-                "Gemini settings",
+                f"{name} settings",
                 "json",
                 True,
             ),
             Candidate(
-                path,
+                mcp_path,
                 "project",
                 "config",
                 _MCP_CAPABILITY_ID,
                 _MCP_CAPABILITY_NAME,
                 kind,
                 name,
-                "Gemini MCP",
+                f"{name} MCP",
                 "json",
                 True,
                 _CONTENT_JSON_MCP,
