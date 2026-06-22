@@ -4,9 +4,9 @@ A managed block is a delimited section inside a provider instruction file
 (``CLAUDE.md`` / ``AGENTS.md`` / ``GEMINI.md``) owned by an ``(owner, section)``
 key and wrapped in sentinel comment lines::
 
-    <!-- BEGIN better-claude:extension:my-ext:rules -->
+    <!-- BEGIN better-agent:extension:my-ext:rules -->
     ...section content...
-    <!-- END better-claude:extension:my-ext:rules -->
+    <!-- END better-agent:extension:my-ext:rules -->
 
 This lets a caller (e.g. an installed extension) add, replace, and remove its
 instructions surgically without touching surrounding, user-authored content.
@@ -28,14 +28,16 @@ import re
 import tempfile
 from pathlib import Path
 
-_BRAND = "better-claude"
+_BRAND = "better-agent"
+_LEGACY_BRAND = "better-claude"
+_BRAND_RE = r"(?:" + re.escape(_BRAND) + r"|" + re.escape(_LEGACY_BRAND) + r")"
 # Owner/section keys: extension ids and section names are validated to
 # [a-z0-9_.-] upstream, plus the "extension:" owner prefix uses ":". Dots,
 # hyphens, underscores are all safe inside an HTML comment sentinel.
 _KEY_RE = re.compile(r"^[A-Za-z0-9_.:-]+$")
 # Reject any content that tries to forge our sentinels — guarantees block
 # boundaries can never be hijacked by the managed text itself.
-_MARKER_RE = re.compile(r"<!-- (BEGIN|END) " + re.escape(_BRAND) + r":")
+_MARKER_RE = re.compile(r"<!-- (BEGIN|END) " + _BRAND_RE + r":")
 
 
 def _validate_key(value: str, field: str) -> None:
@@ -56,12 +58,14 @@ def _render_block(owner: str, section: str, content: str) -> str:
 
 
 def _section_regex(owner: str, section: str) -> re.Pattern:
-    return re.compile(re.escape(_begin(owner, section)) + r".*?" + re.escape(_end(owner, section)), re.DOTALL)
+    begin = r"<!-- BEGIN " + _BRAND_RE + r":" + re.escape(owner) + r":" + re.escape(section) + r" -->"
+    end = r"<!-- END " + _BRAND_RE + r":" + re.escape(owner) + r":" + re.escape(section) + r" -->"
+    return re.compile(begin + r".*?" + end, re.DOTALL)
 
 
 def _owner_regex(owner: str) -> re.Pattern:
-    begin_prefix = re.escape(f"<!-- BEGIN {_BRAND}:{owner}:")
-    end_prefix = re.escape(f"<!-- END {_BRAND}:{owner}:")
+    begin_prefix = r"<!-- BEGIN " + _BRAND_RE + r":" + re.escape(owner) + r":"
+    end_prefix = r"<!-- END " + _BRAND_RE + r":" + re.escape(owner) + r":"
     return re.compile(begin_prefix + r"[^\n]*?-->.*?" + end_prefix + r"[^\n]*?-->", re.DOTALL)
 
 
@@ -169,7 +173,7 @@ def has_owner_blocks(path: Path, owner: str) -> bool:
     return bool(current) and _owner_regex(owner).search(current) is not None
 
 
-_OWNER_BEGIN_RE = re.compile(r"<!-- BEGIN " + re.escape(_BRAND) + r":(extension:[A-Za-z0-9_.-]+):")
+_OWNER_BEGIN_RE = re.compile(r"<!-- BEGIN " + _BRAND_RE + r":(extension:[A-Za-z0-9_.-]+):")
 
 
 def owners_in(path: Path) -> list[str]:

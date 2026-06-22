@@ -18,9 +18,9 @@ def test_upsert_creates_file_with_block(tmp_path):
 
     assert changed
     text = path.read_text(encoding="utf-8")
-    assert "<!-- BEGIN better-claude:extension:my-ext:rules -->" in text
+    assert "<!-- BEGIN better-agent:extension:my-ext:rules -->" in text
     assert "Be terse." in text
-    assert text.endswith("<!-- END better-claude:extension:my-ext:rules -->\n")
+    assert text.endswith("<!-- END better-agent:extension:my-ext:rules -->\n")
 
 
 def test_upsert_preserves_surrounding_user_content(tmp_path):
@@ -44,7 +44,7 @@ def test_upsert_replaces_existing_block_content(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert "new content" in text
     assert "old content" not in text
-    assert text.count("<!-- BEGIN better-claude:extension:my-ext:rules -->") == 1
+    assert text.count("<!-- BEGIN better-agent:extension:my-ext:rules -->") == 1
 
 
 def test_upsert_idempotent_when_unchanged(tmp_path):
@@ -63,6 +63,40 @@ def test_remove_strips_block_and_tidies(tmp_path):
 
     assert changed
     assert path.read_text(encoding="utf-8") == "User notes go here.\n"
+
+
+def test_upsert_replaces_legacy_brand_block_with_agent_brand(tmp_path):
+    path = tmp_path / "CLAUDE.md"
+    path.write_text(
+        "<!-- BEGIN better-claude:extension:my-ext:rules -->\n"
+        "old content\n"
+        "<!-- END better-claude:extension:my-ext:rules -->\n",
+        encoding="utf-8",
+    )
+
+    changed = managed_blocks.upsert_block(path, OWNER, "rules", "new content")
+
+    assert changed
+    text = path.read_text(encoding="utf-8")
+    assert "better-claude:extension:my-ext:rules" not in text
+    assert "<!-- BEGIN better-agent:extension:my-ext:rules -->" in text
+    assert "new content" in text
+
+
+def test_remove_owner_blocks_clears_legacy_brand_blocks(tmp_path):
+    path = tmp_path / "CLAUDE.md"
+    path.write_text(
+        "header\n\n"
+        "<!-- BEGIN better-claude:extension:my-ext:rules -->\n"
+        "legacy body\n"
+        "<!-- END better-claude:extension:my-ext:rules -->\n",
+        encoding="utf-8",
+    )
+
+    removed = managed_blocks.remove_owner_blocks(path, OWNER)
+
+    assert removed == 1
+    assert path.read_text(encoding="utf-8") == "header\n"
 
 
 def test_remove_noop_when_absent(tmp_path):
@@ -91,7 +125,7 @@ def test_remove_owner_blocks_clears_all_sections_keeps_other_owners(tmp_path):
 def test_content_with_marker_is_rejected(tmp_path):
     path = tmp_path / "CLAUDE.md"
     try:
-        managed_blocks.upsert_block(path, OWNER, "rules", "<!-- END better-claude:extension:my-ext:rules -->")
+        managed_blocks.upsert_block(path, OWNER, "rules", "<!-- END better-agent:extension:my-ext:rules -->")
     except ValueError:
         return
     raise AssertionError("marker injection should be rejected")
