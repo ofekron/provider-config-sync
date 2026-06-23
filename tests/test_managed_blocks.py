@@ -7,7 +7,7 @@ sys.path.insert(
     str(Path(__file__).resolve().parents[1] / "packages" / "provider-config-sync-backend" / "src"),
 )
 
-from provider_config_sync_backend import managed_blocks  # noqa: E402
+from provider_config_sync_backend import api, managed_blocks  # noqa: E402
 
 OWNER = "extension:my-ext"
 
@@ -154,3 +154,53 @@ def test_writes_through_symlink_to_real_target(tmp_path):
     # … and the symlink is preserved (not replaced by a regular file).
     assert link.is_symlink()
     assert "injected" in link.read_text(encoding="utf-8")
+
+
+def test_reconcile_managed_instruction_blocks_installs_and_uninstalls(tmp_path):
+    home = tmp_path / "claude-home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    providers = [{"kind": "claude", "config_dir": str(home)}]
+
+    api.reconcile_managed_instruction_blocks(
+        owner=OWNER,
+        desired=[
+            {"scope": "global", "project_root": None, "sections": [("rules", "global rules")]},
+            {"scope": "project", "project_root": project, "sections": [("rules", "project rules")]},
+        ],
+        providers=providers,
+        project_roots=[project],
+    )
+
+    assert "global rules" in (home / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "project rules" in (project / "CLAUDE.md").read_text(encoding="utf-8")
+
+    api.reconcile_managed_instruction_blocks(
+        owner=OWNER,
+        desired=[],
+        providers=providers,
+        project_roots=[project],
+    )
+
+    assert "global rules" not in (home / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "project rules" not in (project / "CLAUDE.md").read_text(encoding="utf-8")
+
+
+def test_sweep_orphan_managed_instruction_blocks(tmp_path):
+    home = tmp_path / "claude-home"
+    home.mkdir()
+    providers = [{"kind": "claude", "config_dir": str(home)}]
+    path = home / "CLAUDE.md"
+    managed_blocks.upsert_block(path, "extension:kept", "rules", "kept")
+    managed_blocks.upsert_block(path, "extension:orphan", "rules", "orphan")
+
+    removed = api.sweep_orphan_managed_instruction_blocks(
+        owners={"extension:kept"},
+        providers=providers,
+    )
+
+    text = path.read_text(encoding="utf-8")
+    assert removed == 1
+    assert "kept" in text
+    assert "orphan" not in text

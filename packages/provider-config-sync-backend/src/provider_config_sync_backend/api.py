@@ -485,6 +485,56 @@ def apply_managed_instruction_blocks(
             managed_blocks.upsert_block(path, owner, section_id, content)
 
 
+def reconcile_managed_instruction_blocks(
+    *,
+    owner: str,
+    desired: list[dict[str, Any]],
+    providers: list[dict],
+    project_roots: list[Path] | None = None,
+) -> None:
+    """Make managed instruction blocks for ``owner`` exactly match ``desired``.
+
+    Callers decide which blocks should exist. PCS owns making that true across
+    provider instruction files.
+    """
+    roots = [_expand_path(root).resolve() for root in (project_roots or [])]
+    targets = set(managed_instruction_targets(scope="global", project_root=None, providers=providers))
+    for root in roots:
+        targets.update(managed_instruction_targets(scope="project", project_root=root, providers=providers))
+    for path in targets:
+        managed_blocks.remove_owner_blocks(path, owner)
+
+    for item in desired:
+        scope = str(item.get("scope") or "")
+        project_root = item.get("project_root")
+        sections = item.get("sections") or []
+        if not sections:
+            continue
+        root = _expand_path(project_root).resolve() if project_root else None
+        for path in managed_instruction_targets(scope=scope, project_root=root, providers=providers):
+            for section_id, content in sections:
+                managed_blocks.upsert_block(path, owner, section_id, content)
+
+
+def sweep_orphan_managed_instruction_blocks(
+    *,
+    owners: set[str],
+    providers: list[dict],
+    project_roots: list[Path] | None = None,
+) -> int:
+    """Remove managed instruction blocks whose owner is no longer installed."""
+    roots = [_expand_path(root).resolve() for root in (project_roots or [])]
+    targets = set(managed_instruction_targets(scope="global", project_root=None, providers=providers))
+    for root in roots:
+        targets.update(managed_instruction_targets(scope="project", project_root=root, providers=providers))
+    removed = 0
+    for path in targets:
+        for owner in managed_blocks.owners_in(path):
+            if owner not in owners:
+                removed += managed_blocks.remove_owner_blocks(path, owner)
+    return removed
+
+
 def clear_managed_instruction_blocks(
     *,
     owner: str,
