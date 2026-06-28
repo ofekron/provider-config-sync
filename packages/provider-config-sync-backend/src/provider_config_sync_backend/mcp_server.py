@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+import urllib.error
+import urllib.request
 from typing import Any
 
 from fastapi import HTTPException
@@ -14,6 +18,38 @@ from .standalone import configure_from_file
 
 def _error(error: HTTPException) -> ValueError:
     return ValueError(str(error.detail))
+
+
+def _core_env(name: str) -> str:
+    for prefix in ("BETTER_CLAUDE_", "BETTER_AGENT_"):
+        value = os.environ.get(prefix + name)
+        if value and value.strip():
+            return value.strip()
+    return ""
+
+
+def _session_capabilities_request(method: str, body: dict | None = None) -> dict[str, Any]:
+    """Call the Better Agent core capabilities endpoint for the current session.
+    Core owns the active-capability write; this MCP is the authorized trigger."""
+    backend_url = _core_env("BACKEND_URL") or "http://localhost:8000"
+    token = _core_env("INTERNAL_TOKEN")
+    sid = _core_env("APP_SESSION_ID")
+    if not sid:
+        raise ValueError("no active session (BETTER_CLAUDE_APP_SESSION_ID unset)")
+    if not token:
+        raise ValueError("capabilities require backend auth (no internal token)")
+    url = f"{backend_url.rstrip('/')}/api/internal/sessions/{sid}/capabilities"
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"X-Internal-Token": token}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", "replace")
+        raise ValueError(f"capability {method} failed ({error.code}): {detail}") from error
 
 
 def create_server() -> FastMCP:
@@ -364,6 +400,27 @@ def create_server() -> FastMCP:
             )
         except HTTPException as error:
             raise _error(error) from error
+
+    @server.tool()
+    def list_capabilities() -> dict[str, Any]:
+        """List the scoped capabilities loadable in the current session and which
+        are currently active."""
+        return _session_capabilities_request("GET")
+
+    @server.tool()
+    def load_capability(capability_id: str) -> dict[str, Any]:
+        """Load a scoped capability (e.g. its MCP + skill) into the current
+        session. Takes effect on the next turn."""
+        return _session_capabilities_request(
+            "POST", {"action": "load", "capability_id": capability_id}
+        )
+
+    @server.tool()
+    def release_capability(capability_id: str) -> dict[str, Any]:
+        """Release a previously loaded capability from the current session."""
+        return _session_capabilities_request(
+            "POST", {"action": "release", "capability_id": capability_id}
+        )
 
     return server
 
